@@ -1,0 +1,189 @@
+@import '/src/assets/fonts/iconfont/material-icons.css';
+
+$background-color-light: #f0f0f0;
+$on-background-color-light: #0f0f0f;
+
+$background-color-dark: #363636;
+$on-background-color-dark: #cfcfcf;
+
+$background-color: $background-color-dark;
+$on-background-color: $on-background-color-dark;
+
+$primary-color: #4a5ab6;
+$on-primary-color: #fff;
+
+$secondary-color: #12315a;
+$on-secondary-color: #fff;
+
+$complementary-color: #a318c2;
+$on-complementary-color: #fff;
+
+$tertiary-color: #1e2735;
+$on-tertiary-color: #262626;
+
+$form-component-min-height: 32px;
+$form-component-min-width: 32px;
+$form-component-min-font-size: 16px;
+
+@mixin touchable($hover-bg-color, $hover-color, $def-bg-color, $def-color, $br-color) {
+    transition: {
+        duration: .3s;
+        timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+        property: color, background-color, box-shadow;
+    }
+    &:hover {
+        color: $hover-color;
+        background-color: $hover-bg-color;
+    }
+
+    &:focus {
+        color: $def-color;
+        background-color: $def-bg-color;
+        outline: none;
+        box-shadow: 0 0 0 2px $br-color;
+    }
+}
+
+body {
+    display: flex;
+    flex-flow: column wrap;
+    min-height: 100vh;
+    margin: 0;
+    background-color: $background-color;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+.img {
+    margin: auto 8px;
+    width: 52px;
+    height: 52px;
+}
+
+.text {
+    margin: 0;
+}
+
+.title {
+    @extend .text;
+    margin: auto 8px;
+    font-size: 28px;
+}
+
+.subtitle {
+    @extend .text;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.body {
+    @extend .text;
+    font-size: 18px;
+    font-weight: 400;
+}
+
+.form-element {
+    margin: 0;
+    padding: 0;
+    font-size: $form-component-min-font-size;
+    width: $form-component-min-width;
+    height: $form-component-min-height;
+    border: none;
+    border-radius: 6px;
+}
+
+.input {
+    @extend .form-element;
+    @include touchable($background-color, $on-background-color, $background-color, $on-background-color, $tertiary-color);
+    padding: 0 12px;
+    font-size: $form-component-min-font-size;
+    color: $on-background-color;
+    background-color: $background-color;
+    width: auto;
+}
+
+.btn {
+    @extend .form-element;
+    @include touchable(darken($complementary-color, 10%), inherit, $complementary-color, $on-complementary-color, $tertiary-color);
+    color: $on-complementary-color;
+    background-color: $complementary-color;
+}
+
+.list {
+    list-style: none;
+    margin: 0;
+    margin-block: 0;
+    margin-inline: 0;
+    padding-block: 0;
+    padding-inline: 0;
+}
+
+.todo-list-component {
+    max-width: 500px;
+    margin: 32px auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, max-content);
+    color: $on-primary-color;
+    background-color: $primary-color;
+    border-radius: 8px;
+    gap: 16px;
+
+    .header {
+        display: flex;
+        flex-flow: row wrap;
+    }
+
+    .display-box {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto;
+        gap: 16px;
+        padding: 12px 20px;
+        background-color: $secondary-color;
+        border-radius: 6px;
+
+        button {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+        }
+    }
+
+    .search {
+        display: grid;
+        grid-auto-flow: column;
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .todo-list {
+        @extend .list;
+        display: grid;
+        gap: 8px;
+    }
+
+    .todo-item {
+        @include touchable(lighten($secondary-color, 10%), inherit, $secondary-color, $on-secondary-color, $complementary-color);
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 16px;
+        align-items: center;      
+        padding: 12px 20px;
+        border-radius: 6px;
+        color: $on-secondary-color;
+        background-color: $secondary-color;
+
+        .subtitle {
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .undone {
+            background-color: $tertiary-color;
+            border: 2px solid $complementary-color;
+        }
+    }
+}
