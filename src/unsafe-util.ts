@@ -1,10 +1,18 @@
+import { hash } from "./helper.js";
+
 type ListOfType = "string" | "number" | "bigint" | "boolean" | "symbol" | "undefined" | "object" | "function";
-type SubscribeHandler<T> = (value: T) => void;
+type OSubscribeHandler<T> = (value: T) => void;
+type ASubscribeHandler<T> = (value: T, data: DataAPI) => void;
+export type DataAPI = {
+    method: string;
+    parameter: any[];
+}
 
 export class ObserverUnsafe<Value> {
     protected type: ListOfType;
     protected value: Value;
-    protected subscribers: SubscribeHandler<Value>[] = [];
+    protected subscribers: OSubscribeHandler<Value>[] = [];
+    protected binds: WeakMap<ObserverUnsafe<Value>, OSubscribeHandler<Value>> = new Map();
     constructor(data: Value) {
         this.type = typeof data;
         this.value = data;
@@ -18,23 +26,45 @@ export class ObserverUnsafe<Value> {
             this.value = value;
             this.publish(value);
         }
+        return this;
+    }
+    equal(value: Value) {
+        return this.value == value;
     }
     get() {
         return this.value;
     }
-    update(value?: Value){
+    update(value?: Value) {
         this.publish(value ?? this.value);
         return this;
     }
-    subscribe(handler: SubscribeHandler<Value>) {
+    bind(observeableData: ObserverUnsafe<Value>, handler?: OSubscribeHandler<Value>) {
+        handler = handler ?? ((value) => observeableData.set(value));
+        this.binds.set(observeableData, handler);
+        this.subscribe(handler);
+        observeableData.set(this.value).subscribe((value) => this.set(value));
+        return this;
+    }
+    unbind(observeableData: ObserverUnsafe<Value>) {
+        const handler = this.binds.get(observeableData);
+        if (handler) {
+            this.unsubscribe(handler);
+            observeableData.unbind(this);
+        } else {
+            throw new Error('bind not exist');
+        }
+        return this;
+    }
+    subscribe(handler: OSubscribeHandler<Value>) {
         const type = typeof handler;
         if (type == 'function') {
             this.subscribers.push(handler);
         } else {
             throw new TypeError(`Mismatch on type, expect function but ${type}`)
         };
+        return this;
     }
-    unsubscribe(handler: SubscribeHandler<Value>): boolean {
+    unsubscribe(handler: OSubscribeHandler<Value>): boolean {
         let index = 0;
         let pos = 0;
         for (const subscriber of this.subscribers) {
@@ -51,11 +81,11 @@ export class ObserverUnsafe<Value> {
         }
     }
     protected publish(value: Value) {
-        // const startTime = Date.now();
+        console.time(this.constructor.name + ' publish');
         for (const subscriber of this.subscribers) {
             subscriber(value);
         }
-        // console.log(this.constructor.name, 'take time publish', (Date.now() - startTime), 'ms');
+        console.timeEnd(this.constructor.name + ' publish');
     }
     [Symbol.toPrimitive](hint: 'string' | 'number' | 'default') {
         return this.value;
@@ -63,6 +93,92 @@ export class ObserverUnsafe<Value> {
     [Symbol.isConcatSpreadable]: boolean = true;
     toJSON(key: string) {
         return this.value
+    }
+}
+export class ObserverStructureUnsafe<RawValue> {
+    protected type: ListOfType;
+    protected value: RawValue;
+    protected subscribers: ASubscribeHandler<RawValue>[] = [];
+    protected binds: WeakMap<ObserverStructureUnsafe<RawValue>, ASubscribeHandler<RawValue>> = new Map();
+    constructor(data: RawValue) {
+        this.type = typeof data;
+        this.value = data;
+    }
+    set(value: RawValue) {
+        if (value != this.value) {
+            const type = typeof value;
+            if (type != this.type) {
+                throw new TypeError(`Mismatch on type, expect ${this.type} but ${type}`)
+            }
+            this.value = value;
+            this.publish(value, { method: 'set', parameter: [value] });
+        }
+        return this;
+    }
+    equal(value: RawValue) {
+        return this.value == value;
+    }
+    get() {
+        return this.value;
+    }
+    bind(observeableData: ObserverStructureUnsafe<RawValue>, handler?: ASubscribeHandler<RawValue>) {
+        handler = handler ?? ((value) => observeableData.set(value));
+        this.binds.set(observeableData, handler);
+        this.subscribe(handler);
+        observeableData.set(this.value).subscribe((value) => this.set(value));
+        return this;
+    }
+    unbind(observeableData: ObserverStructureUnsafe<RawValue>) {
+        const handler = this.binds.get(observeableData);
+        if (handler) {
+            this.unsubscribe(handler);
+            observeableData.unbind(this);
+        } else {
+            throw new Error('bind not exist');
+        }
+        return this;
+    }
+    subscribe(handler: ASubscribeHandler<RawValue>) {
+        const type = typeof handler;
+        if (type == 'function') {
+            this.subscribers.push(handler);
+        } else {
+            throw new TypeError(`Mismatch on type, expect function but ${type}`)
+        };
+        return this;
+    }
+    unsubscribe(handler: ASubscribeHandler<RawValue>): boolean {
+        let index = 0;
+        let pos = 0;
+        for (const subscriber of this.subscribers) {
+            if (Object.is(subscriber, handler)) {
+                pos = index;
+            }
+            index++;
+        }
+        if (pos) {
+            this.subscribers.splice(pos, 1);
+            return true;
+        } else {
+            return false;
+        }
+    }
+    protected publish(value: RawValue, data: DataAPI) {
+        console.time(this.constructor.name + ' publish');
+        for (const subscriber of this.subscribers) {
+            subscriber(value, data);
+        }
+        console.timeEnd(this.constructor.name + ' publish');
+    }
+    [Symbol.toPrimitive](hint: 'string' | 'number' | 'default') {
+        return this.value;
+    }
+    [Symbol.isConcatSpreadable]: boolean = true;
+    toJSON(key: string) {
+        return this.value
+    }
+    protected send(data: DataAPI) {
+
     }
 }
 export class ChangeTrackerUnsafe<RawValue> {
@@ -127,18 +243,21 @@ type Task<Data = any, Result = any> = {
 }
 
 export class ProcessManagementUnsafe {
-    static get isStarted() {
+    constructor() {
+        this.start();
+    }
+    get isStarted() {
         return this.started;
     }
-    static get queued(){
+    get queued() {
         return this.taskQueue.length;
     }
-    private static readonly taskQueue: Task[] = [];
-    private static readonly keySet: Set<TaskKey> = new Set();
-    private static started: boolean = false;
-    private static isSleep: boolean = false;
-    private static wakeUp: (value: unknown) => void;
-    private static sleep() {
+    private readonly taskQueue: Task[] = [];
+    private readonly keySet: Set<TaskKey> = new Set();
+    private started: boolean = false;
+    private isSleep: boolean = false;
+    private wakeUp!: (value: unknown) => void;
+    private sleep() {
         return new Promise((resolve) => {
             console.log('process sleep');
             console.timeEnd('process live');
@@ -150,7 +269,7 @@ export class ProcessManagementUnsafe {
             this.isSleep = false;
         })
     }
-    private static async * taskGenerator(): AsyncGenerator<Task | void> {
+    private async * taskGenerator(): AsyncGenerator<Task | void> {
         while (true) {
             const task = this.taskQueue.shift();
             if (task) {
@@ -160,11 +279,12 @@ export class ProcessManagementUnsafe {
             }
         }
     }
-    static queue<Data, Result>(data: Data, handler: TaskHandler<Data, Result>, key?: TaskKey) {
+    queue<Data, Result, Key extends TaskKey | undefined>(data: Data, handler: TaskHandler<Data, Result>, key?: Key) {
         if (key) {
             if (this.keySet.has(key)) {
-                console.warn('The task locked');
-                return {id: -1, promise: Promise.resolve(undefined)};
+                console.warn('The task is locked');
+                this.taskQueue.find((task) => task.id == 0)?.reject('lala');
+                return { id: -1, promise: Promise.resolve(undefined) };
             } else {
                 this.keySet.add(key);
             }
@@ -172,13 +292,13 @@ export class ProcessManagementUnsafe {
         const id = this.taskQueue.length;
         return {
             id,
-            promise: new Promise<Result | undefined>((resolve, reject) => {
-                this.taskQueue.push({id, data, aborted: false, key, handler, reject, resolve});
+            promise: new Promise<Key extends undefined ? Result : (Result | undefined)>((resolve, reject) => {
+                this.taskQueue.push({ id, data, aborted: false, key, handler, reject, resolve });
                 this.isSleep && this.wakeUp(null);
-            }).finally(() => key && this.keySet.delete(key))
+            })
         }
     }
-    static dequeue(id: number) {
+    dequeue(id: number) {
         for (const task of this.taskQueue) {
             if (task.id == id) {
                 task.aborted = true;
@@ -188,15 +308,15 @@ export class ProcessManagementUnsafe {
         }
         return false;
     }
-    static lock(key: TaskKey) {
+    lock(key: TaskKey) {
         this.keySet.add(key);
         return this;
     }
-    static unlock(key: TaskKey) {
+    unlock(key: TaskKey) {
         this.keySet.delete(key);
         return this;
     }
-    static start() {
+    start() {
         if (this.started) {
             return;
         } else {
@@ -205,31 +325,45 @@ export class ProcessManagementUnsafe {
             this.started = true;
             this.process();
         }
+        return this;
     }
-    private static async process() {
+    private async process() {
         for await (const task of this.taskGenerator()) {
             if (task) {
-                console.time('process time');
                 if (task.aborted) {
-                    console.timeEnd('process time');
                     continue;
                 }
                 try {
                     task.resolve(await task.handler(task.data));
                 } catch (error) {
-                    task.reject(error);
+                    task.reject(new error.constructor(error.message));
                 } finally {
                     task.key && this.keySet.delete(task.key);
                 }
-                console.timeEnd('process time');
             }
         }
     }
-    static finish() {
+    finish() {
         console.log('process finish');
-        console.timeEnd('process live');
         this.started = false;
+        return this;
     }
 }
 
-ProcessManagementUnsafe.start();
+export class Promiseify<T> extends Promise<T> {
+    static get [Symbol.species]() {
+        return Promise;
+    }
+    resolver!: (value: T) => void;
+    rejector!: (error: any) => void;
+    constructor(...args: any[]) {
+        let resolver: any
+        let rejector: any
+        super((resolve, reject) => {
+            resolver = resolve;
+            rejector = reject;
+        });
+        this.resolver = resolver;
+        this.rejector = rejector;
+    }
+}

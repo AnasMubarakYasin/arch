@@ -1,3 +1,5 @@
+import { DataAPI } from "./unsafe-util";
+
 type NodeElement = 1
 type NodeAttr = 2;
 type NodeText = 3
@@ -21,7 +23,7 @@ type Compare = (a: Element, b: Element) => number;
 
 abstract class ObserveableNodeUnsafe<Value, VHandler = Value> {
     get Class() {
-        return ObserveableNodeUnsafe;
+        return this.constructor;
     }
 
     abstract target: Node;
@@ -30,7 +32,6 @@ abstract class ObserveableNodeUnsafe<Value, VHandler = Value> {
     abstract typeValue: string;
     abstract prevValue: Value;
 
-    disconnected = true;
     observerHandlerList: ObserverHandler<VHandler>[] = [];
 
     abstract attachTo(element: Element): void;
@@ -75,7 +76,6 @@ abstract class ObserveableNodeUnsafe<Value, VHandler = Value> {
     }
     disconnect() {
         this.observer.disconnect();
-        this.disconnected = true;
         return this;
     }
 }
@@ -305,6 +305,10 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe<Array<Node | st
         return this;
     }
     set(nodes: Array<Node | string> | HTMLCollection) {
+        this.target.replaceChildren(...nodes);
+        return this;
+    }
+    diff(nodes: Array<Node | string> | HTMLCollection) {
         let length = nodes.length;
         if (length == 0) {
             this.clear();
@@ -357,6 +361,20 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe<Array<Node | st
             this.splice(nodes.length - this.target.children.length, this.target.children.length - nodes.length);
         }
         return this;
+    }
+    adapter(data: DataAPI, render: (data: any) => Element[]) {
+        const method = data.method
+        if (method == 'pop' || method == 'shift' || method == 'reverse') {
+            this[method]();
+        } else if (method == 'push' || method == 'unshift') {
+            this[method](...render(data.parameter[0]));
+        } else if (method == 'splice') {
+            this[method](data.parameter[0], data.parameter[1], ...render(data.parameter[2]));
+        } else if (method == 'set') {
+            this[method](render(data.parameter[0]));
+        } else {
+            throw new TypeError('Not support api');
+        }
     }
     get() {
         return this.target.children;
@@ -441,8 +459,9 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe<Array<Node | st
         return [...this.target.children].sort(compareFunc);
     }
     reverse() {
-        return [...this.target.children].reverse();
+        return this.set([...this.target.children].reverse());
     }
+
 
     filter(predicate: Predicate) {
         return [...this.target.children].filter(predicate);

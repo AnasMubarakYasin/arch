@@ -108,10 +108,10 @@ export function domParser(string) {
 export function trim(string) {
     return string.replaceAll(/\s|\n/g, '');
 }
-export function wait(ms, callback = () => { }) {
+export function wait(ms, callback) {
     return new Promise((resolve) => {
         setTimeout(() => {
-            resolve(callback());
+            resolve(callback ? callback() : undefined);
         }, ms);
     });
 }

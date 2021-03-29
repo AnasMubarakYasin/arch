@@ -1,4 +1,4 @@
-@import '/src/assets/fonts/iconfont/material-icons.css';
+@import '/example/assets/fonts/iconfont/material-icons.css';
 body {
   display: flex;
   flex-flow: column wrap;
@@ -161,7 +161,7 @@ main {
   font-size: 16px;
   font-weight: 500;
 }
-.todo-list-component .todo-item .undone {
+.todo-list-component .todo-item[data-done=false] .btn.done {
   background-color: #1e2735;
   border: 2px solid #a318c2;
 }

@@ -1,10 +1,107 @@
-// import { render, html, RawStream } from './html-templating.js';
+console.time('init');
+// import { forOf, render, html, RawStream, block } from '../../src/html-templating.js';
 // import { ObserveableData } from './observeable-data.js';
 // import { StateAction } from './state-action.js';
 
-import '../page/home/index.js'
+// html`<div>
+//     <ul>
+//         ${forOf([1, 2, 3], (raw, item, index) => {
+//             raw`<li>hi ${item}</li>`;
+//         })}
+//     </ul>
+//     <div>
+//         ${block({name: 'anas'}, (raw, data) => {
+//             raw`<p>${data.name}</p>`;
+//         })}
+//     </div>
+// </div>`;
 
-console.time('init');
+// import {a} from './a.js';
+// import {b} from './b.js';
+
+// console.log(a, b);
+
+import '../page/home/index.js';
+// import { open, env } from '../../src/db.js';
+// import {get, env} from '../../src/req.js';
+// import { wait } from '../../src/helper.js';
+
+// env.debug = true;
+
+// console.log(get('index.html'));
+// window.http = get('http://localhost:6060/example/assets/fonts/iconfont/material-icons.css');
+// let response;
+
+// const abortController = new AbortController();
+// const promise = new Promise<void>((res, rej) => {
+//     wait(0, () => res());
+//     abortController.signal.addEventListener('abort', (event) => {
+//         console.log(event);
+//         rej();
+//     });
+//     response = get('index.html');
+// }).then(() => console.log('sucess') ).catch(() => console.error('failed'));
+// wait(0, () => {
+//     abortController.abort();
+//     console.log(response);
+// });
+
+
+// const dbor = open<{test: {name: string, age: number}, spec: {detail: string}}>('test');
+// dbor.onUpgrade(async (db) => {
+//     const store = await db.create('test', {autoIncrement: true, keyPath: 'name'});
+//     store.createIndex('name', 'name', {multiEntry: true, unique: true});
+//     store.addAll([{name: 'anas', age: 21}, {name: 'mubarak', age: 19}]);
+// });
+// const db = await dbor;
+// const result = await db.read('test', async (store) => {
+//     // const val = await store.getAll();
+//     const val = await store.index('name').getAll();
+//     return val;
+// });
+
+// console.log(result);
+
+// dbor.onSuccess(async (db) => {
+//     console.log('success', db);
+//     // const result = db.read('test', async (store) => store.get(1));
+//     // console.log(await result);
+// }).onUpgrade(async (db) => {
+//     console.log('upgrade', db);
+
+//     if (!db.contains('test')) {
+//         const store = await db.create('test', {autoIncrement: true});
+
+//         await store.add({name: 'anas mubarak yasin', age: 21});
+//     }
+// }).onError((error) => {
+//     console.error('error', error);
+// }).onBlock((error) => {
+//     console.error('block', error);
+// });
+
+// dbc.db.then((db) => {
+//     db.onChange((db) => {
+//         console.log('change', db);
+//     }).onError((error) => {
+//         console.error('error', db);
+//     }).onClose((error) => {
+//         console.error('close', error);
+//     }).onAbort((error) => {
+//         console.error('abort', error);
+//     });
+//     // db.upgrade().
+//     window.db = db;
+//     // console.log(db);
+// }).catch((reason) => {
+//     console.error('dbc error', reason);
+// });
+
+// console.log(dbc);
+
+// window.dbopen = open;
+
+console.timeEnd('init');
 
 // const idComponent = Symbol('todo-list');
 // const detail = new ObserveableData.Map({
@@ -133,7 +230,6 @@ console.time('init');
 // console.log(preset);
 // render(preset, 'main');
 
-console.timeEnd('init');
 
 // detail.subscribe((value) => console.log(value));
 

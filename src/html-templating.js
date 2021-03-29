@@ -10,6 +10,9 @@ const ARG = '$';
 const mapId = new Map();
 const caches = new Map();
 const cachesStream = new Map();
+export const env = {
+    debug: true,
+};
 export class HtmlRawStream {
     constructor() {
         this.bufferRender = [];
@@ -42,25 +45,25 @@ export class HtmlRawStream {
         const length = template.stringLength;
         const hashed = hash(template.string, length);
         const cache = cachesStream.get(hashed);
-        let presets = [];
+        let trees = [];
         if (cache) {
-            presets = cache.presets;
-            for (const arg of cache.args) {
-                arg.pointer = template.args.shift()?.pointer;
+            trees = cache.trees;
+            for (const arg of cache.pointers) {
+                arg.pointer = template.pointer.shift()?.pointer;
             }
         }
         else {
             while (template.stringIndex < length) {
-                presets.push(transformCore(template));
+                trees.push(transformCore(template));
             }
-            cachesStream.set(hashed, { presets, args: template.args });
+            cachesStream.set(hashed, { trees: trees, pointers: template.pointer });
         }
         const templateRender = buildTemplateRender({
-            preset: { attributes: {}, children: [], tag: '', text: '', type: 'text' },
-            pointers: template.args
+            tree: { attributes: {}, children: [], tag: '', text: '', type: 'text' },
+            pointers: template.pointer
         });
         this.templateRenders.push(templateRender);
-        for (const preset of presets) {
+        for (const preset of trees) {
             this.bufferRender.push(runtimeRenderering(preset, templateRender));
         }
         this.templateStrings = [''];
@@ -78,18 +81,18 @@ export function html(stringLiterals, ...templateList) {
     const template = buildTemplateInit(stringLiterals, templateList);
     const hashed = hash(template.string, template.stringLength);
     const cache = caches.get(hashed);
-    let preset = null;
+    let tree;
     if (cache) {
-        preset = cache.preset;
-        for (const arg of cache.args) {
-            arg.pointer = template.args.shift()?.pointer;
+        tree = cache.tree;
+        for (const arg of cache.pointer) {
+            arg.pointer = template.pointer.shift()?.pointer;
         }
     }
     else {
-        preset = transformCore(template);
-        caches.set(hashed, { preset, args: template.args });
+        tree = transformCore(template);
+        caches.set(hashed, { tree: tree, pointer: template.pointer });
     }
-    return { preset, pointers: template.args };
+    return { tree: tree, pointers: template.pointer };
 }
 html.registerElement = function (symbol, element) {
     mapId.set(symbol, element);
@@ -97,7 +100,49 @@ html.registerElement = function (symbol, element) {
 html.getElement = function (symbol) {
     return mapId.get(symbol);
 };
-function buildTemplateRender(templateView) {
+export function forOf(list, view) {
+    return new ScopeForOf(list, view);
+}
+export function block(data, view) {
+    return new ScopeBlock(data, view);
+}
+class ContextScope {
+    constructor(data) {
+        this.HRStream = new HtmlRawStream();
+        this.data = data;
+        this.stream = this.HRStream.stream.bind(this.HRStream);
+    }
+    render() {
+        this.HRStream.restart();
+        return this.HRStream.bufferRender;
+    }
+}
+class ScopeBlock extends ContextScope {
+    constructor(data, view) {
+        super(data);
+        this.view = view;
+    }
+    render(data) {
+        this.HRStream.restart();
+        this.view(this.stream, data ?? this.data);
+        return this.HRStream.bufferRender;
+    }
+}
+class ScopeForOf extends ContextScope {
+    constructor(list, view) {
+        super(list);
+        this.view = view;
+    }
+    render(list) {
+        this.HRStream.restart();
+        let index = 0;
+        for (const item of (list ?? this.data)) {
+            this.view(this.stream, item, index++);
+        }
+        return this.HRStream.bufferRender;
+    }
+}
+function buildTemplateRender(templatePreset) {
     const eventRegistered = [];
     const idRegistered = [];
     const observeableRegistered = [];
@@ -105,15 +150,15 @@ function buildTemplateRender(templateView) {
         eventRegister: eventRegistered,
         symbolIdRegister: idRegistered,
         observeableRegister: observeableRegistered,
-        pointers: templateView.pointers,
-        preset: templateView.preset,
+        pointers: templatePreset.pointers,
+        tree: templatePreset.tree,
         subsTemplate: [],
         streams: []
     };
 }
 export function release(template) {
     for (const eventRegistered of template.eventRegister) {
-        eventRegistered.element.removeEventListener(...eventRegistered.eventInit);
+        eventRegistered.element.removeEventListener.apply(null, eventRegistered.eventInit);
     }
     for (const symbolId of template.symbolIdRegister) {
         mapId.delete(symbolId);
@@ -125,9 +170,9 @@ export function release(template) {
         pointer.pointer = null;
     }
 }
-export function render(templateView, selector) {
-    const templateRender = buildTemplateRender(templateView);
-    const element = runtimeRenderering(templateView.preset, templateRender);
+export function render(templatePreset, selector) {
+    const templateRender = buildTemplateRender(templatePreset);
+    const element = runtimeRenderering(templatePreset.tree, templateRender);
     if (selector) {
         const comment = document.createComment('generate by html-template urjs');
         if (typeof selector == 'string') {
@@ -139,19 +184,19 @@ export function render(templateView, selector) {
     }
     return templateRender;
 }
-function runtimeRenderering(preset, template) {
+function runtimeRenderering(tree, template) {
     // const typeElement = typeof preset.tag;
     let element = null;
-    if (typeof preset.tag == 'string') {
-        element = document.createElement(preset.tag);
+    if (typeof tree.tag == 'string') {
+        element = document.createElement(tree.tag);
     }
-    else if (typeof preset.tag == 'object') {
-        element = preset.tag.pointer(preset.attributes, preset.children);
+    else if (typeof tree.tag == 'object') {
+        element = tree.tag.pointer(tree.attributes, tree.children);
     }
     else {
-        throw new TypeError('unknown type tag: ' + preset.tag);
+        throw new TypeError('unknown type tag: ' + tree.tag);
     }
-    for (const [key, values] of Object.entries(preset.attributes)) {
+    for (const [key, values] of Object.entries(tree.attributes)) {
         if (key[0] == 'o' && key[1] == 'n') {
             const eventInit = [key.slice(2)];
             if (Array.isArray(values)) {
@@ -159,61 +204,51 @@ function runtimeRenderering(preset, template) {
                     eventInit.push(value.pointer);
                 }
             }
-            element.addEventListener(...eventInit);
+            element.addEventListener.apply(element, eventInit);
             template.eventRegister.push({ element, eventInit });
         }
         else if (key[0] == 'i' && key[1] == 'd') {
-            if (Array.isArray(values)) {
-                for (const value of values) {
-                    if (typeof value == 'object') {
-                        if (typeof value.pointer == 'symbol') {
-                            html.registerElement(value.pointer, element);
-                            element.id = value.pointer.toString();
-                            template.symbolIdRegister.push(value.pointer);
-                        }
-                        else {
-                            element.id += value.pointer;
-                        }
+            for (const value of values) {
+                if (typeof value == 'object') {
+                    if (typeof value.pointer == 'symbol') {
+                        html.registerElement(value.pointer, element);
+                        element.id = value.pointer.toString();
+                        template.symbolIdRegister.push(value.pointer);
                     }
                     else {
-                        element.id += value.toString();
+                        element.id += value.pointer;
                     }
                 }
-            }
-            else {
-                element.id = values.toString();
+                else {
+                    element.id += value.toString();
+                }
             }
         }
         else {
             let accumulation = '';
             let observeableData = null;
-            if (Array.isArray(values)) {
-                for (const value of values) {
-                    // const type = typeof value;
-                    if (typeof value == 'string' || typeof value == 'number' || typeof value == 'boolean') {
-                        accumulation += value.toString();
-                    }
-                    else if (typeof value == 'object') {
-                        if (value.pointer instanceof ObserveableData.Value) {
-                            if (observeableData) {
-                                throw new Error('Cannot use multiple observeable on a attribute key: ' + key);
-                            }
-                            else {
-                                observeableData = value.pointer;
-                                accumulation += value.pointer;
-                            }
+            for (const value of values) {
+                // const type = typeof value;
+                if (typeof value == 'string' || typeof value == 'number' || typeof value == 'boolean') {
+                    accumulation += value.toString();
+                }
+                else if (typeof value == 'object') {
+                    if (value.pointer instanceof ObserveableData.Value) {
+                        if (observeableData) {
+                            throw new Error('Cannot use multiple observeable on a attribute value');
                         }
                         else {
+                            observeableData = value.pointer;
                             accumulation += value.pointer;
                         }
                     }
                     else {
-                        throw new TypeError('unknown type value: ' + values);
+                        accumulation += value.pointer;
                     }
                 }
-            }
-            else {
-                accumulation = JSON.stringify(values);
+                else {
+                    throw new TypeError('unknown type value: ' + values);
+                }
             }
             if (observeableData) {
                 const observeableNode = new ObserveableAttrNode(key, accumulation).attachTo(element);
@@ -226,7 +261,7 @@ function runtimeRenderering(preset, template) {
             }
         }
     }
-    for (const child of preset.children) {
+    for (const child of tree.children) {
         if (child.type == 'text') {
             if (typeof child.text == 'object') {
                 const text = child.text.pointer;
@@ -236,32 +271,31 @@ function runtimeRenderering(preset, template) {
                     text.subscribe(handler);
                     template.observeableRegister.push({ data: text, handler });
                 }
-                else if (typeof text == 'function') {
-                    const hStream = new HtmlRawStream();
-                    const stream = hStream.stream.bind(hStream);
-                    const observeableData = text(stream);
-                    const nodeList = hStream.render();
-                    template.streams.push(hStream);
-                    if (observeableData instanceof ObserveableData.List) {
-                        const observeableNode = new ObserveableChildNodes(...nodeList).attachTo(element);
-                        const handler = (value) => {
-                            hStream.restart(), text(stream);
-                            observeableNode.set(hStream.render());
-                        };
-                        observeableData.subscribe(handler);
-                        template.observeableRegister.push({ data: observeableData, handler });
-                    }
-                    else if (observeableData instanceof ObserveableData.Map) {
-                        const observeableNode = new ObserveableNode(element).append(...nodeList);
-                        const handler = (value) => {
-                            hStream.restart(), text(stream);
-                            observeableNode.replaceChildren(...hStream.render());
-                        };
-                        observeableData.subscribe(handler);
-                        template.observeableRegister.push({ data: observeableData, handler });
+                else if (text instanceof ContextScope) {
+                    const observeableData = text.data;
+                    template.streams.push(text.HRStream);
+                    if (text instanceof ScopeForOf) {
+                        if (observeableData instanceof ObserveableData.List) {
+                            const observeableNode = new ObserveableChildNodes(...text.render()).attachTo(element);
+                            const handler = (value, data) => {
+                                observeableNode.adapter(data, text.render.bind(text));
+                            };
+                            observeableData.subscribe(handler);
+                            template.observeableRegister.push({ data: observeableData, handler });
+                        }
                     }
                     else {
-                        element.append(...nodeList);
+                        if (observeableData instanceof ObserveableData.Map) {
+                            const observeableNode = new ObserveableNode(element).append(...text.render());
+                            const handler = (value) => {
+                                observeableNode.replaceChildren(...text.render());
+                            };
+                            observeableData.subscribe(handler);
+                            template.observeableRegister.push({ data: observeableData, handler });
+                        }
+                        else {
+                            element.append(...text.render());
+                        }
                     }
                 }
                 else {
@@ -290,7 +324,7 @@ function buildTemplateInit(strings, args) {
     }
     string = string.trimEnd();
     stringLength = string.length;
-    return { string, args: templateArgs, stringIndex: 0, argPos, stringLength, indexArg: 0 };
+    return { string, pointer: templateArgs, stringIndex: 0, argPos, stringLength, indexPointer: 0 };
 }
 function transformCore(template) {
     const string = template.string;
@@ -377,14 +411,15 @@ function transformCore(template) {
                     else if (char == ARG) {
                         if (template.argPos[0] == index) {
                             template.argPos.shift();
-                            const arg = template.args[template.indexArg++];
+                            const arg = template.pointer[template.indexPointer++];
                             if (context == VALUE) {
                                 buffer = buffer ? buffer + arg.pointer : arg;
                             }
                             else if (context == KEY) {
                                 if (buffer[0] == '.' && buffer[2] == '.') {
-                                    addProperties(root.attributes, arg);
-                                    buffer = '';
+                                    env.debug && console.error('not support object spread');
+                                    // addProperties(root.attributes, arg);
+                                    // buffer = ''
                                 }
                                 else {
                                     buffer += arg;
@@ -434,7 +469,7 @@ function transformCore(template) {
         else if (char == ARG) {
             if (template.argPos[0] == index) {
                 template.argPos.shift();
-                const arg = template.args[template.indexArg++];
+                const arg = template.pointer[template.indexPointer++];
                 if (context == CHILD) {
                     if (string[index - 1] == '.' && string[index - 3] == '.') {
                         root.children.push(...arg);
@@ -453,8 +488,9 @@ function transformCore(template) {
                 }
             }
             else {
-                console.warn(template);
-                console.warn(char, index, template.argPos[0], stringLength);
+                env.debug && console.error('template arg miss');
+                // console.warn(template);
+                // console.warn(char, index, template.argPos[0], stringLength);
             }
         }
         else {

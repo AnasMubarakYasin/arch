@@ -109,10 +109,10 @@ export function trim(string: string): string {
   return string.replaceAll(/\s|\n/g, '');
 }
 
-export function wait(ms: number, callback = () => {}) {
-  return new Promise((resolve) => {
+export function wait<R>(ms?: number, callback?: () => R) {
+  return new Promise<R>((resolve) => {
     setTimeout(() => {
-      resolve(callback());
+      resolve(callback ? callback() : undefined as unknown as R);
     }, ms);
   })
 }

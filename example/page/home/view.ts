@@ -1,14 +1,13 @@
-import {html, RawStream} from '../../script/html-templating.js';
-import { ObserveableListInstance, ObserveableMapInstance } from '../../script/observeable-data.js';
+import { html, forOf, block } from '../../../src/html-templating.js';
+import { ObserveableListInstance, ObserveableMapInstance } from '../../../src/observeable-data.js';
 import { action } from './controller.js';
 
 type Detail = {state: string, title: string, description: string};
-type List = {id: number, title: string, description: string, complete: boolean}[];
+type List = {id: number, title: string, description: string, done: boolean}[];
 
 export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableListInstance<List>) => {
     const getId = (element: HTMLElement) => parseInt(element.closest('li')?.dataset.id ?? '-1');
     const itemClick = (event: MouseEvent) => {
-        console.log('clicked');
         action.dispatch('showItem', {id: getId(event.target as HTMLElement)});
     };
     const deleteItem = (event: MouseEvent) => {
@@ -22,9 +21,13 @@ export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableLi
         action.dispatch('editItem');
     }
     const editDoneItem = (event: MouseEvent) => {
-        const description = (event.target as HTMLElement).previousSibling?.nodeValue;
-        const title = (event.target as HTMLElement).previousSibling?.previousSibling?.nodeValue;
-        action.dispatch('editDoneItem', {title, description});
+        action.dispatch('editDoneItem');
+    }
+    const editTitle = (event: InputEvent) => {
+        action.dispatch('editTitle', {value: (event.target as HTMLInputElement).value});
+    }
+    const editDescription = (event: InputEvent) => {
+        action.dispatch('editDescription', {value: (event.target as HTMLInputElement).value});
     }
     const completeItem = (event: MouseEvent) => {
         event.stopPropagation();
@@ -34,9 +37,9 @@ export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableLi
         action.dispatch('searchItem', {value: (event.target as HTMLInputElement).value});
     }
     return html`
-        <section class="todo-list-component" translate="false" theme="light">
+        <section class="todo-list-component" translate="false" theme="dark">
             <header class="header">
-                <img class="img" src="/src/assets/images/task-list-icon-19.jpg" alt="todo list"/>
+                <img class="img" src="/example/assets/images/task-list-icon-19.jpg" alt="todo list"/>
                 <h1 class="title">To-Do List Project</h1>
             </header>
             <div class="search">
@@ -44,36 +47,32 @@ export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableLi
                 <button class="btn md-icons">search</button>
             </div>
             <article class="display-box" state="${detail.state}">
-                ${(html: RawStream) => {
-                    if (detail.state.get() == 'display') {
-                        html`
+                ${block(detail, (raw, data) => {
+                    if (detail.state.equal('display')) {
+                        raw`
                             <h2 class="subtitle">${detail.title}</h2>
                             <p class="body">${detail.description}</p>
                             <button class="btn md-icons" onclick="${editItem}">edit</button>
                         `.flush();
                     } else {
-                        html`
-                            <input class="input" placeholder="title" value="${detail.title}"/>
-                            <input class="input" placeholder="description" value="${detail.description}"/>
+                        raw`
+                            <input class="input" placeholder="title" value="${detail.title}" oninput="${editTitle}"/>
+                            <input class="input" placeholder="description" value="${detail.description}" oninput="${editDescription}"/>
                             <button class="btn md-icons" onclick="${editDoneItem}">done</button>
                         `.flush();
                     }
-                    return detail;
-                }}
+                })}
             </article>
             <ul class="todo-list"> 
-                ${(html: RawStream) => {
-                    for (const item of list) {
-                        html`
-                            <li data-id="${item.id}" tabindex="0" class="todo-item" onclick="${itemClick}">
-                                <span class="subtitle">${item.title}</span>
-                                <button class="btn ${item.complete ? '' : 'undone'} md-icons" onclick="${completeItem}">done</button>
-                                <button class="btn md-icons" onclick="${deleteItem}">delete</button>
-                            </li>
-                        `.flush();
-                    }
-                    return list;
-                }}
+                ${forOf(list, (raw, item) => {
+                    raw`
+                        <li data-id="${item.id}" data-done="${item.done}" tabindex="0" class="todo-item" onclick="${itemClick}">
+                            <span class="subtitle">${item.title}</span>
+                            <button class="btn md-icons done" onclick="${completeItem}">done</button>
+                            <button class="btn md-icons" onclick="${deleteItem}">delete</button>
+                        </li>
+                    `.flush();
+                })}
             </ul> 
             <button class="btn md-icons" onclick="${addItem}">add</button>
         </section>

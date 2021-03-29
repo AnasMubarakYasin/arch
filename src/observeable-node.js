@@ -1,10 +1,9 @@
 class ObserveableNodeUnsafe {
     constructor() {
-        this.disconnected = true;
         this.observerHandlerList = [];
     }
     get Class() {
-        return ObserveableNodeUnsafe;
+        return this.constructor;
     }
     observe(handler) {
         if (typeof handler == 'function') {
@@ -43,7 +42,6 @@ class ObserveableNodeUnsafe {
     }
     disconnect() {
         this.observer.disconnect();
-        this.disconnected = true;
         return this;
     }
 }
@@ -242,6 +240,10 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe {
         return this;
     }
     set(nodes) {
+        this.target.replaceChildren(...nodes);
+        return this;
+    }
+    diff(nodes) {
         let length = nodes.length;
         if (length == 0) {
             this.clear();
@@ -302,6 +304,24 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe {
             this.splice(nodes.length - this.target.children.length, this.target.children.length - nodes.length);
         }
         return this;
+    }
+    adapter(data, render) {
+        const method = data.method;
+        if (method == 'pop' || method == 'shift' || method == 'reverse') {
+            this[method]();
+        }
+        else if (method == 'push' || method == 'unshift') {
+            this[method](...render(data.parameter[0]));
+        }
+        else if (method == 'splice') {
+            this[method](data.parameter[0], data.parameter[1], ...render(data.parameter[2]));
+        }
+        else if (method == 'set') {
+            this[method](render(data.parameter[0]));
+        }
+        else {
+            throw new TypeError('Not support api');
+        }
     }
     get() {
         return this.target.children;
@@ -376,7 +396,7 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe {
         return [...this.target.children].sort(compareFunc);
     }
     reverse() {
-        return [...this.target.children].reverse();
+        return this.set([...this.target.children].reverse());
     }
     filter(predicate) {
         return [...this.target.children].filter(predicate);

@@ -1,9 +1,8 @@
-import { html } from '../../script/html-templating.js';
+import { html, forOf, block } from '../../../src/html-templating.js';
 import { action } from './controller.js';
 export const view = (detail, list) => {
     const getId = (element) => parseInt(element.closest('li')?.dataset.id ?? '-1');
     const itemClick = (event) => {
-        console.log('clicked');
         action.dispatch('showItem', { id: getId(event.target) });
     };
     const deleteItem = (event) => {
@@ -17,9 +16,13 @@ export const view = (detail, list) => {
         action.dispatch('editItem');
     };
     const editDoneItem = (event) => {
-        const description = event.target.previousSibling?.nodeValue;
-        const title = event.target.previousSibling?.previousSibling?.nodeValue;
-        action.dispatch('editDoneItem', { title, description });
+        action.dispatch('editDoneItem');
+    };
+    const editTitle = (event) => {
+        action.dispatch('editTitle', { value: event.target.value });
+    };
+    const editDescription = (event) => {
+        action.dispatch('editDescription', { value: event.target.value });
     };
     const completeItem = (event) => {
         event.stopPropagation();
@@ -29,9 +32,9 @@ export const view = (detail, list) => {
         action.dispatch('searchItem', { value: event.target.value });
     };
     return html `
-        <section class="todo-list-component" translate="false" theme="light">
+        <section class="todo-list-component" translate="false" theme="dark">
             <header class="header">
-                <img class="img" src="/src/assets/images/task-list-icon-19.jpg" alt="todo list"/>
+                <img class="img" src="/example/assets/images/task-list-icon-19.jpg" alt="todo list"/>
                 <h1 class="title">To-Do List Project</h1>
             </header>
             <div class="search">
@@ -39,37 +42,33 @@ export const view = (detail, list) => {
                 <button class="btn md-icons">search</button>
             </div>
             <article class="display-box" state="${detail.state}">
-                ${(html) => {
-        if (detail.state.get() == 'display') {
-            html `
+                ${block(detail, (raw, data) => {
+        if (detail.state.equal('display')) {
+            raw `
                             <h2 class="subtitle">${detail.title}</h2>
                             <p class="body">${detail.description}</p>
                             <button class="btn md-icons" onclick="${editItem}">edit</button>
                         `.flush();
         }
         else {
-            html `
-                            <input class="input" placeholder="title" value="${detail.title}"/>
-                            <input class="input" placeholder="description" value="${detail.description}"/>
+            raw `
+                            <input class="input" placeholder="title" value="${detail.title}" oninput="${editTitle}"/>
+                            <input class="input" placeholder="description" value="${detail.description}" oninput="${editDescription}"/>
                             <button class="btn md-icons" onclick="${editDoneItem}">done</button>
                         `.flush();
         }
-        return detail;
-    }}
+    })}
             </article>
             <ul class="todo-list"> 
-                ${(html) => {
-        for (const item of list) {
-            html `
-                            <li data-id="${item.id}" tabindex="0" class="todo-item" onclick="${itemClick}">
-                                <span class="subtitle">${item.title}</span>
-                                <button class="btn ${item.complete ? '' : 'undone'} md-icons" onclick="${completeItem}">done</button>
-                                <button class="btn md-icons" onclick="${deleteItem}">delete</button>
-                            </li>
-                        `.flush();
-        }
-        return list;
-    }}
+                ${forOf(list, (raw, item) => {
+        raw `
+                        <li data-id="${item.id}" data-done="${item.done}" tabindex="0" class="todo-item" onclick="${itemClick}">
+                            <span class="subtitle">${item.title}</span>
+                            <button class="btn md-icons done" onclick="${completeItem}">done</button>
+                            <button class="btn md-icons" onclick="${deleteItem}">delete</button>
+                        </li>
+                    `.flush();
+    })}
             </ul> 
             <button class="btn md-icons" onclick="${addItem}">add</button>
         </section>
