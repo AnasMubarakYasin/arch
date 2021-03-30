@@ -1,4 +1,4 @@
-import { ObserverStructureUnsafe, ObserverUnsafe, DataAPI } from './unsafe-util.js';
+import { ObserverAPIUnsafe, ObserverUnsafe, DataAPI } from './unsafe-util.js';
 type TypeOptional<O> = {
     [P in keyof O]?: O[P];
 }
@@ -23,9 +23,9 @@ export type ObserveableMapInstance<O extends object> = ObserveableMap<O> & Obser
 type ObserifyListConstructor = new <O extends Array<M>, M = InferArray<O>>(list: O) => ObserveableListInstance<O, M>;
 export type ObserveableListInstance<O extends Array<M>, M = InferArray<O>> = ObserveableList<O, M>;
 
-class ObserveableValue<Value extends PrimitiveType> extends ObserverUnsafe<Value> { }
+class ObserveableValue<Value extends PrimitiveType> extends ObserverUnsafe<Value> {}
 
-class ObserveableMap<Data extends object> extends ObserverStructureUnsafe<Data> {
+class ObserveableMap<Data extends object> extends ObserverAPIUnsafe<Data> {
     readonly size: number = 0;
     constructor(data: Data) {
         super(data);
@@ -48,7 +48,7 @@ class ObserveableMap<Data extends object> extends ObserverStructureUnsafe<Data> 
                 value: obserify,
                 enumerable: true
             });
-            obserify.subscribe((value: MemberOf<Data>) => this.value[key as KeyOf<Data>] = value as MemberOf<Data>);
+            obserify.subscribe((value: MemberOf<Data>) => {this.raw[key as KeyOf<Data>] = value as MemberOf<Data>});
             this.size++;
         }
     }
@@ -59,14 +59,15 @@ class ObserveableMap<Data extends object> extends ObserverStructureUnsafe<Data> 
             if (!this[key as KeyOf<this>]) {
                 throw new RangeError('Key not found: ' + key);
             }
-            if (val != this.value[key as KeyOf<Data>]) {
+            if (val != this.raw[key as KeyOf<Data>]) {
                 const obserify = this[key as KeyOf<this>] as unknown as ObserveableDataInstance<MemberOf<Data>>;
                 change[key] = obserify.set(val as any);
                 publish = true;
             }
         }
         if (publish) {
-            this.publish(this.value, {method: 'set', parameter: [change]});
+            this.publish(this.raw);
+            this.publishAPI({method: 'set', parameter: [change]});
         }
         return this;
     }
@@ -74,7 +75,7 @@ class ObserveableMap<Data extends object> extends ObserverStructureUnsafe<Data> 
         return this[Symbol.iterator];
     }
     *[Symbol.iterator]() {
-        for (const iterator of Object.entries(this.value)) {
+        for (const iterator of Object.entries(this.raw)) {
             yield {
                 key: iterator[0],
                 value: iterator[1]
@@ -86,7 +87,7 @@ class ObserveableMap<Data extends object> extends ObserverStructureUnsafe<Data> 
     }
 }
 
-class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends ObserverStructureUnsafe<List> {
+class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends ObserverAPIUnsafe<List> {
     constructor(list: List) {
         super(list);
         this.observeables = this.toObserveable(list);
@@ -96,14 +97,15 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
     observeables: ObserifyMatch<Item>[];
 
     get length() {
-        return this.value.length;
+        return this.raw.length;
     }
 
     set(value: List) {
         if (Array.isArray(value)) {
-            this.value = value;
+            this.raw = value;
             this.observeables = this.toObserveable(value);
-            this.publish(value, {method: 'set', parameter: [this.observeables]});
+            this.publish(value);
+            this.publishAPI({method: 'set', parameter: [this.observeables]});
         } else {
             throw new TypeError(`Mismatch on type, expect array but ${typeof value}`)
         }
@@ -111,15 +113,24 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
     }
 
     setByObserver(items: ObserifyMatch<Item>[]) {
-        this.publish(this.toRaw(items) as List, {method: 'set', parameter: [items]});
+        this.publish(this.raw = this.toRaw());
+        this.publishAPI({method: 'diff', parameter: [items]});
         return this;
     }
 
-    update(data: DataAPI, value?: List) {
-        if (!value) {
-            value = this.value;
-        }
-        this.publish(value, data);
+    setTempByObserver(items: ObserifyMatch<Item>[]) {
+        this.publish(this.toRaw(items) as List);
+        this.publishAPI({method: 'set', parameter: [items]});
+        return this;
+    }
+
+    update(value?: List) {
+        throw new Error('The method not implement');
+    }
+
+    updateByAPI(data: DataAPI) {
+        this.publish(this.raw);
+        this.publishAPI(data);
         return this;
     }
 
@@ -139,10 +150,13 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
         return result;
     }
 
-    toRaw(items: ObserifyMatch<Item>[]) {
-        const result: Item[] = []
-        for (const item of items) {
-            result.push(item.get() as Item);
+    toRaw(items?: ObserifyMatch<Item>[]): List {
+        const result: any = []
+        for (const item of items ?? this.observeables) {
+            result.push(item.get());
+        }
+        if (items) {
+            this.raw = result;
         }
         return result;
     }
@@ -162,46 +176,46 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
         }
     }
     pop() {
-        this.value.pop();
+        this.raw.pop();
         this.observeables.pop();
-        return this.update({method: 'pop', parameter: []});
+        return this.updateByAPI({method: 'pop', parameter: []});
     }
     push(...items: Item[]) {
-        this.value.push(...items);
+        this.raw.push(...items);
         const newValue = this.toObserveable(items);
         this.observeables.push(...newValue);
-        return this.update({method: 'push', parameter: [newValue]});
+        return this.updateByAPI({method: 'push', parameter: [newValue]});
     }
     reverse() {
-        this.value.reverse();
+        this.raw.reverse();
         this.observeables.reverse();
-        return this.update({method: 'reverse', parameter: []});
+        return this.updateByAPI({method: 'reverse', parameter: []});
     }
     shift() {
-        this.value.shift();
+        this.raw.shift();
         this.observeables.shift();
-        return this.update({method: 'shift', parameter: []});
+        return this.updateByAPI({method: 'shift', parameter: []});
 
     }
     sort(compareFn?: (a: ObserifyMatch<Item>, b: ObserifyMatch<Item>) => number) {
         this.observeables.sort(compareFn);
-        this.value = this.toRaw(this.observeables) as List;
-        return this.update({method: 'sort', parameter: [compareFn]});
+        this.raw = this.toRaw(this.observeables) as List;
+        return this.updateByAPI({method: 'sort', parameter: [compareFn]});
 
     }
     splice(start: number, deleteCount?: number): this;
     splice(start: number, deleteCount: number, ...items: Item[]): this;
     splice(start: any, deleteCount?: any, ...rest: any[]) {
-        this.value.splice(start, deleteCount, ...rest);
+        this.raw.splice(start, deleteCount, ...rest);
         const newValue = this.toObserveable(rest);
         this.observeables.splice(start, deleteCount, ...newValue);
-        return this.update({method: 'splice', parameter: [start, deleteCount, newValue]});
+        return this.updateByAPI({method: 'splice', parameter: [start, deleteCount, newValue]});
     }
     unshift(...items: Item[]) {
-        this.value.unshift(...items);
+        this.raw.unshift(...items);
         const newValue = this.toObserveable(items);
         this.observeables.unshift(...this.toObserveable(items));
-        return this.update({method: 'unshift', parameter: [newValue]});
+        return this.updateByAPI({method: 'unshift', parameter: [newValue]});
     }
     
     slice(start?: number, end?: number) {

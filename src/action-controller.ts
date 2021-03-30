@@ -15,9 +15,10 @@ type PR<H> = ExtractPromise<Return<ValueOf<H>>>;
 
 export class ActionController<H extends HandlerInit> {
     readonly handler: H;
-    readonly process: ProcessManagementUnsafe = new ProcessManagementUnsafe();
+    readonly process: ProcessManagementUnsafe;
     constructor(handler: H) {
         this.handler = handler;
+        this.process = new ProcessManagementUnsafe('@'+this.constructor.name);
     }
     dispatch<N extends KeyOf<H>, D extends P<MemberOf<H, N>>, R = PR<H>>(name: N, data: D = {} as D) {;
         return this.process.queue<D, R, string>(data, this.handler[name], name as string).promise;

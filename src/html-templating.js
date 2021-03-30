@@ -252,7 +252,7 @@ function runtimeRenderering(tree, template) {
             }
             if (observeableData) {
                 const observeableNode = new ObserveableAttrNode(key, accumulation).attachTo(element);
-                const handler = (value) => observeableNode.set(value.toString());
+                const handler = (value) => { observeableNode.set(value.toString()); };
                 observeableData.subscribe(handler);
                 template.observeableRegister.push({ data: observeableData, handler });
             }
@@ -267,7 +267,7 @@ function runtimeRenderering(tree, template) {
                 const text = child.text.pointer;
                 if (text instanceof ObserveableData.Value) {
                     const observeableNode = new ObserveableTextNode(text.get()).attachTo(element);
-                    const handler = (value) => observeableNode.set(value);
+                    const handler = (value) => { observeableNode.set(value); };
                     text.subscribe(handler);
                     template.observeableRegister.push({ data: text, handler });
                 }
@@ -277,10 +277,10 @@ function runtimeRenderering(tree, template) {
                     if (text instanceof ScopeForOf) {
                         if (observeableData instanceof ObserveableData.List) {
                             const observeableNode = new ObserveableChildNodes(...text.render()).attachTo(element);
-                            const handler = (value, data) => {
+                            const handler = (data) => {
                                 observeableNode.adapter(data, text.render.bind(text));
                             };
-                            observeableData.subscribe(handler);
+                            observeableData.subscribeAPI(handler);
                             template.observeableRegister.push({ data: observeableData, handler });
                         }
                     }

@@ -28,7 +28,7 @@ type EventRegistered = {
 }
 type ObserveableRegistered = {
     data: ObserveableValueInstance<any> | ObserveableListInstance<any> | ObserveableMapInstance<any>
-    handler: ((p: any) => any) | ((p: any, d: any) => any);
+    handler: ((p: any) => any);
 }
 type TemplateComponent = (attribute: any, children: any[]) => Element;
 type TemplateStream = (stream: HtmlRawStream) => void | ObserveableListInstance<unknown[]> | ObserveableMapInstance<any>;
@@ -325,7 +325,7 @@ function runtimeRenderering(tree: TemplateTree, template: TemplateRuntime) {
             }
             if (observeableData) {
                 const observeableNode = new ObserveableAttrNode(key, accumulation).attachTo(element);
-                const handler = (value: any) => observeableNode.set(value.toString());
+                const handler = (value: any) => {observeableNode.set(value.toString())};
                 observeableData.subscribe(handler);
                 template.observeableRegister.push({ data: observeableData, handler });
             } else {
@@ -339,7 +339,7 @@ function runtimeRenderering(tree: TemplateTree, template: TemplateRuntime) {
                 const text = child.text.pointer as any;
                 if (text instanceof ObserveableData.Value) {
                     const observeableNode = new ObserveableTextNode(text.get()).attachTo(element);
-                    const handler = (value: any) => observeableNode.set(value);
+                    const handler = (value: any) => {observeableNode.set(value)};
                     text.subscribe(handler);
                     template.observeableRegister.push({ data: text, handler });
                 } else if (text instanceof ContextScope) {
@@ -348,10 +348,10 @@ function runtimeRenderering(tree: TemplateTree, template: TemplateRuntime) {
                     if (text instanceof ScopeForOf) {
                         if (observeableData instanceof ObserveableData.List) {
                             const observeableNode = new ObserveableChildNodes(...text.render()).attachTo(element);
-                            const handler = (value: any, data: any) => {
+                            const handler = (data: any) => {
                                 observeableNode.adapter(data, text.render.bind(text));
                             }
-                            observeableData.subscribe(handler);
+                            observeableData.subscribeAPI(handler);
                             template.observeableRegister.push({ data: observeableData, handler });
                         }
                     } else {

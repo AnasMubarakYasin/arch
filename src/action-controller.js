@@ -2,8 +2,8 @@ import { ProcessManagementUnsafe } from './unsafe-util.js';
 // type InitAction = (controller: ActionController)
 export class ActionController {
     constructor(handler) {
-        this.process = new ProcessManagementUnsafe();
         this.handler = handler;
+        this.process = new ProcessManagementUnsafe('@' + this.constructor.name);
     }
     dispatch(name, data = {}) {
         ;

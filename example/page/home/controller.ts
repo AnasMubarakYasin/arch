@@ -44,7 +44,7 @@ export const action = new ActionController({
     async searchItem(data: { value: string }) {
         if (detail.state.equal('display')) {
             const filtered = list.filter((item) => RegExp(data.value, 'img').test(item.title.get()));
-            list.setByObserver(filtered.map((item, index) => {
+            list.setTempByObserver(filtered.map((item, index) => {
                 item.id.set(index);
                 return item;
             }));

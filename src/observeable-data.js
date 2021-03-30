@@ -1,7 +1,7 @@
-import { ObserverStructureUnsafe, ObserverUnsafe } from './unsafe-util.js';
+import { ObserverAPIUnsafe, ObserverUnsafe } from './unsafe-util.js';
 class ObserveableValue extends ObserverUnsafe {
 }
-class ObserveableMap extends ObserverStructureUnsafe {
+class ObserveableMap extends ObserverAPIUnsafe {
     constructor(data) {
         super(data);
         this.size = 0;
@@ -26,7 +26,7 @@ class ObserveableMap extends ObserverStructureUnsafe {
                 value: obserify,
                 enumerable: true
             });
-            obserify.subscribe((value) => this.value[key] = value);
+            obserify.subscribe((value) => { this.raw[key] = value; });
             this.size++;
         }
     }
@@ -37,14 +37,15 @@ class ObserveableMap extends ObserverStructureUnsafe {
             if (!this[key]) {
                 throw new RangeError('Key not found: ' + key);
             }
-            if (val != this.value[key]) {
+            if (val != this.raw[key]) {
                 const obserify = this[key];
                 change[key] = obserify.set(val);
                 publish = true;
             }
         }
         if (publish) {
-            this.publish(this.value, { method: 'set', parameter: [change] });
+            this.publish(this.raw);
+            this.publishAPI({ method: 'set', parameter: [change] });
         }
         return this;
     }
@@ -52,7 +53,7 @@ class ObserveableMap extends ObserverStructureUnsafe {
         return this[Symbol.iterator];
     }
     *[Symbol.iterator]() {
-        for (const iterator of Object.entries(this.value)) {
+        for (const iterator of Object.entries(this.raw)) {
             yield {
                 key: iterator[0],
                 value: iterator[1]
@@ -63,7 +64,7 @@ class ObserveableMap extends ObserverStructureUnsafe {
         yield* this[Symbol.iterator]();
     }
 }
-class ObserveableList extends ObserverStructureUnsafe {
+class ObserveableList extends ObserverAPIUnsafe {
     constructor(list) {
         super(list);
         // [index: number]: Item;
@@ -71,13 +72,14 @@ class ObserveableList extends ObserverStructureUnsafe {
         this.observeables = this.toObserveable(list);
     }
     get length() {
-        return this.value.length;
+        return this.raw.length;
     }
     set(value) {
         if (Array.isArray(value)) {
-            this.value = value;
+            this.raw = value;
             this.observeables = this.toObserveable(value);
-            this.publish(value, { method: 'set', parameter: [this.observeables] });
+            this.publish(value);
+            this.publishAPI({ method: 'set', parameter: [this.observeables] });
         }
         else {
             throw new TypeError(`Mismatch on type, expect array but ${typeof value}`);
@@ -85,14 +87,21 @@ class ObserveableList extends ObserverStructureUnsafe {
         return this;
     }
     setByObserver(items) {
-        this.publish(this.toRaw(items), { method: 'set', parameter: [items] });
+        this.publish(this.raw = this.toRaw());
+        this.publishAPI({ method: 'diff', parameter: [items] });
         return this;
     }
-    update(data, value) {
-        if (!value) {
-            value = this.value;
-        }
-        this.publish(value, data);
+    setTempByObserver(items) {
+        this.publish(this.toRaw(items));
+        this.publishAPI({ method: 'set', parameter: [items] });
+        return this;
+    }
+    update(value) {
+        throw new Error('The method not implement');
+    }
+    updateByAPI(data) {
+        this.publish(this.raw);
+        this.publishAPI(data);
         return this;
     }
     toObserveable(items) {
@@ -114,8 +123,11 @@ class ObserveableList extends ObserverStructureUnsafe {
     }
     toRaw(items) {
         const result = [];
-        for (const item of items) {
+        for (const item of items ?? this.observeables) {
             result.push(item.get());
+        }
+        if (items) {
+            this.raw = result;
         }
         return result;
     }
@@ -136,42 +148,42 @@ class ObserveableList extends ObserverStructureUnsafe {
         }
     }
     pop() {
-        this.value.pop();
+        this.raw.pop();
         this.observeables.pop();
-        return this.update({ method: 'pop', parameter: [] });
+        return this.updateByAPI({ method: 'pop', parameter: [] });
     }
     push(...items) {
-        this.value.push(...items);
+        this.raw.push(...items);
         const newValue = this.toObserveable(items);
         this.observeables.push(...newValue);
-        return this.update({ method: 'push', parameter: [newValue] });
+        return this.updateByAPI({ method: 'push', parameter: [newValue] });
     }
     reverse() {
-        this.value.reverse();
+        this.raw.reverse();
         this.observeables.reverse();
-        return this.update({ method: 'reverse', parameter: [] });
+        return this.updateByAPI({ method: 'reverse', parameter: [] });
     }
     shift() {
-        this.value.shift();
+        this.raw.shift();
         this.observeables.shift();
-        return this.update({ method: 'shift', parameter: [] });
+        return this.updateByAPI({ method: 'shift', parameter: [] });
     }
     sort(compareFn) {
         this.observeables.sort(compareFn);
-        this.value = this.toRaw(this.observeables);
-        return this.update({ method: 'sort', parameter: [compareFn] });
+        this.raw = this.toRaw(this.observeables);
+        return this.updateByAPI({ method: 'sort', parameter: [compareFn] });
     }
     splice(start, deleteCount, ...rest) {
-        this.value.splice(start, deleteCount, ...rest);
+        this.raw.splice(start, deleteCount, ...rest);
         const newValue = this.toObserveable(rest);
         this.observeables.splice(start, deleteCount, ...newValue);
-        return this.update({ method: 'splice', parameter: [start, deleteCount, newValue] });
+        return this.updateByAPI({ method: 'splice', parameter: [start, deleteCount, newValue] });
     }
     unshift(...items) {
-        this.value.unshift(...items);
+        this.raw.unshift(...items);
         const newValue = this.toObserveable(items);
         this.observeables.unshift(...this.toObserveable(items));
-        return this.update({ method: 'unshift', parameter: [newValue] });
+        return this.updateByAPI({ method: 'unshift', parameter: [newValue] });
     }
     slice(start, end) {
         return this.observeables.slice(start, end);
