@@ -1,12 +1,12 @@
-# urjs
+# arch
 
 lightweight and simple library for building front-end web applications.
 
 ## Overview
 
-With urjs you can create a web front-end easily, several modules will help you create applications and will be integrated with each other. 
+With arch you can create a web front-end easily, several modules will help you create applications and will be integrated with each other. 
 
-urjs modules:
+arch modules main modules:
 
 * `html-templating`: Allows you to write ui (html) declaratively in javascript.
 * `observeable-data`: Allows you to define observable data, with one change it will be notified to all observers, `observeable-data` object can also be integrated with `html-templating` which will make it reactive.
@@ -45,7 +45,7 @@ const preset = html`
     <button onclick="${click}">click me</button>
 `;
 
-// Also attribute.
+// Also assign value to attribute.
 
 const theme = 'dark';
 
