@@ -11,40 +11,45 @@ type PrimitiveTypeData<O> = {
 }
 type InferArray<A> = A extends Array<infer T> ? T : never;
 type PrimitiveDataMemberOf<P> = PrimitiveTypeData<P>[keyof PrimitiveTypeData<P>];
-type ObserifyValueConstructor = new <O extends PrimitiveType>(value: O) => ObserveableValueInstance<O>;
-type ObserifyMatch<Type> = Type extends (number | string) ? ObserveableValueInstance<Type> : Type extends (true | false | boolean) ? ObserveableValueInstance<boolean> : Type extends Array<infer T> ? ObserveableListInstance<Type, T> : Type extends object ? ObserveableMapInstance<Type> : never
-type ObserveableDataInstance<T> = ObserveableValueInstance<T extends PrimitiveType ? T : never> | ObserveableListInstance<T extends Array<any> ? T : never, InferArray<T>> | ObserveableMapInstance<T extends object ? T : never>;
-export type ObserveableValueInstance<O extends PrimitiveType> = ObserveableValue<O>
-type ObserifyMix<O extends object> = {
-    [P in keyof O]: ObserifyMatch<O[P]>;
+type ObservableMatch<Type> = Type extends (number | string) ? ObservableValue<Type> : Type extends (true | false | boolean) ? ObservableValue<boolean> : Type extends Array<infer T> ? ObservableList<Type, T> : Type extends object ? ObservableMap<Type> : never;
+type ObservableData<T> = ObservableValue<T extends PrimitiveType ? T : never> | ObservableList<T extends Array<any> ? T : never, InferArray<T>> | ObservableMap<T extends object ? T : never>;
+type ObservableMix<O extends object> = {
+    [P in keyof O]: ObservableMatch<O[P]>;
 }
-type ObserifyMapConstructor = new <O extends object>(data: O) => ObserveableMapInstance<O>;
-export type ObserveableMapInstance<O extends object> = ObserveableMap<O> & ObserifyMix<O>
-type ObserifyListConstructor = new <O extends Array<M>, M = InferArray<O>>(list: O) => ObserveableListInstance<O, M>;
-export type ObserveableListInstance<O extends Array<M>, M = InferArray<O>> = ObserveableList<O, M>;
+type NormalizeBoolean<O> = O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : never;
 
-class ObserveableValue<Value extends PrimitiveType> extends ObserverUnsafe<Value> {}
+type NormalizeObject<O> = {
+    [P in keyof O]: Normalize<O[P]>;
+}
+type NormalizeArray<O> = O extends Array<infer T> ? Array<Normalize<T>> : never;
+type NormalizePrmitive<O> = O extends string ? string : O extends number ? number : O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : never;
+type Normalize<O> = O extends Array<infer T> ? Array<Normalize<T>> : O extends object ? {[P in keyof O]: Normalize<O[P]>} : O extends string ? string : O extends number ? number : O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : any;
 
-class ObserveableMap<Data extends object> extends ObserverAPIUnsafe<Data> {
+type ObservableValueConstruct = new <O extends PrimitiveType>(value: O) => ObservableValue<O>;
+export type ObservableValue<O extends PrimitiveType> = ObserifyValue<O>;
+
+type ObservableMapConstruct = new <O extends object>(data: O) => ObservableMap<O>;
+export type ObservableMap<O extends object> = ObserifyMap<O> & ObservableMix<O>;
+
+type ObservableListConstruct = new <O extends Array<InferArray<O>>>(list: O) => ObservableList<O>;
+export type ObservableList<O extends Array<InferArray<O>>> = ObserifyList<O>;
+
+class ObserifyValue<Value extends PrimitiveType> extends ObserverUnsafe<Value> {}
+
+class ObserifyMap<Data extends object> extends ObserverAPIUnsafe<Data> implements Iterable<{key: string, value: any}> {
     readonly size: number = 0;
     constructor(data: Data) {
         super(data);
         for (const [key, value] of Object.entries(data)) {
-            let obserify: ObserveableDataInstance<any>
+            let obserify: ObservableData<any>
             if (Array.isArray(value)) {
-                obserify = new ObserveableList(value)
+                obserify = new ObserifyList(value)
             } else if (typeof value == 'object') {
-                obserify = new ObserveableMap(value);
+                obserify = new ObserifyMap(value);
             } else {
-                obserify = new ObserveableValue(value);
+                obserify = new ObserifyValue(value);
             }
             Object.defineProperty(this, key, {
-                // set(value) {
-                //     obserify.set(value);
-                // },
-                // get() {
-                //     return obserify.get();
-                // },
                 value: obserify,
                 enumerable: true
             });
@@ -60,7 +65,7 @@ class ObserveableMap<Data extends object> extends ObserverAPIUnsafe<Data> {
                 throw new RangeError('Key not found: ' + key);
             }
             if (val != this.raw[key as KeyOf<Data>]) {
-                const obserify = this[key as KeyOf<this>] as unknown as ObserveableDataInstance<MemberOf<Data>>;
+                const obserify = this[key as KeyOf<this>] as unknown as ObservableData<MemberOf<Data>>;
                 change[key] = obserify.set(val as any);
                 publish = true;
             }
@@ -87,14 +92,14 @@ class ObserveableMap<Data extends object> extends ObserverAPIUnsafe<Data> {
     }
 }
 
-class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends ObserverAPIUnsafe<List> {
+class ObserifyList<List extends Array<Item>, Item = InferArray<List>, Observable = ObservableMatch<Item>> extends ObserverAPIUnsafe<List> implements Iterable<Observable> {
     constructor(list: List) {
-        super(list);
-        this.observeables = this.toObserveable(list);
+        super(list as List);
+        this.observeables = this.toObserveable(list as List);
     }
     // [index: number]: Item;
     selected: number = -1;
-    observeables: ObserifyMatch<Item>[];
+    observeables: Observable[];
 
     get length() {
         return this.raw.length;
@@ -112,13 +117,13 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
         return this;
     }
 
-    setByObserver(items: ObserifyMatch<Item>[]) {
+    setByObserver(items: Observable[]) {
         this.publish(this.raw = this.toRaw());
         this.publishAPI({method: 'diff', parameter: [items]});
         return this;
     }
 
-    setTempByObserver(items: ObserifyMatch<Item>[]) {
+    setTempByObserver(items: Observable[]) {
         this.publish(this.toRaw(items) as List);
         this.publishAPI({method: 'set', parameter: [items]});
         return this;
@@ -135,22 +140,22 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
     }
 
     toObserveable(items: Item[]) {
-        const result: ObserifyMatch<Item>[] = [];
+        const result: Observable[] = [];
         for (const item of items) {
             let obserify: any;
             if (Array.isArray(item)) {
-                obserify = new ObserveableList(item)
+                obserify = new ObserifyList(item as any);
             } else if (typeof item == 'object') {
-                obserify = new ObserveableMap(item as any);
+                obserify = new ObserifyMap(item as any);
             } else {
-                obserify = new ObserveableValue(item as any);
+                obserify = new ObserifyValue(item as any);
             }
-            result.push(obserify as unknown as ObserifyMatch<Item>);
+            result.push(obserify as unknown as Observable);
         }
         return result;
     }
 
-    toRaw(items?: ObserifyMatch<Item>[]): List {
+    toRaw(items?: Observable[]): List {
         const result: any = []
         for (const item of items ?? this.observeables) {
             result.push(item.get());
@@ -161,7 +166,7 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
         return result;
     }
 
-    at(index: number): ObserifyMatch<Item> {
+    at(index: number): Observable {
         if (typeof index != 'number') {
             throw new TypeError('Index type must a number');
         }
@@ -197,7 +202,7 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
         return this.updateByAPI({method: 'shift', parameter: []});
 
     }
-    sort(compareFn?: (a: ObserifyMatch<Item>, b: ObserifyMatch<Item>) => number) {
+    sort(compareFn?: (a: Observable, b: Observable) => number) {
         this.observeables.sort(compareFn);
         this.raw = this.toRaw(this.observeables) as List;
         return this.updateByAPI({method: 'sort', parameter: [compareFn]});
@@ -221,81 +226,90 @@ class ObserveableList<List extends Array<Item>, Item = InferArray<List>> extends
     slice(start?: number, end?: number) {
         return this.observeables.slice(start, end);
     }
-    concat(...items: ConcatArray<ObserifyMatch<Item>>[]): ObserifyMatch<Item>[];
-    concat(...items: (ObserifyMatch<Item> | ConcatArray<ObserifyMatch<Item>>)[]): ObserifyMatch<Item>[];
+    concat(...items: ConcatArray<Observable>[]): Observable[];
+    concat(...items: (Observable | ConcatArray<Observable>)[]): Observable[];
     concat(...items: any[]) {
         return this.observeables.concat(...items);
     }
     join(separator?: string) {
         return this.observeables.join(separator);
     }
-    indexOf(searchElement: ObserifyMatch<Item>, fromIndex?: number): number {
+    indexOf(searchElement: Observable, fromIndex?: number): number {
         return this.observeables.indexOf(searchElement, fromIndex);
     }
-    lastIndexOf(searchElement: ObserifyMatch<Item>, fromIndex?: number): number {
+    lastIndexOf(searchElement: Observable, fromIndex?: number): number {
         return this.observeables.lastIndexOf(searchElement, fromIndex);
     }
-    every<S extends ObserifyMatch<Item>>(predicate: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => value is S, thisArg?: any): this is S[];
-    every(predicate: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => unknown, thisArg?: any): boolean;
+    every<S extends Observable>(predicate: (value: Observable, index: number, array: Observable[]) => value is S, thisArg?: any): this is S[];
+    every(predicate: (value: Observable, index: number, array: Observable[]) => unknown, thisArg?: any): boolean;
     every(predicate: any, thisArg?: any): boolean {
         return this.observeables.every(predicate, thisArg);
     }
-    some(predicate: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => unknown, thisArg?: any): boolean {
+    some(predicate: (value: Observable, index: number, array: Observable[]) => unknown, thisArg?: any): boolean {
         return this.observeables.some(predicate, thisArg);
     }
-    forEach(callbackfn: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => void, thisArg?: any): void {
+    forEach(callbackfn: (value: Observable, index: number, array: Observable[]) => void, thisArg?: any): void {
         this.observeables.forEach(callbackfn, thisArg);
     }
-    map(callbackfn: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>, thisArg?: any) {
+    map(callbackfn: (value: Observable, index: number, array: Observable[]) => Observable, thisArg?: any) {
         return this.observeables.map(callbackfn, thisArg);
     }
-    filter<S extends ObserifyMatch<Item>[]>(predicate: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>[], thisArg?: any): ObserifyMatch<Item>[];
-    filter(predicate: (value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => unknown, thisArg?: any): ObserifyMatch<Item>[];
+    filter<S extends Observable[]>(predicate: (value: Observable, index: number, array: Observable[]) => Observable[], thisArg?: any): Observable[];
+    filter(predicate: (value: Observable, index: number, array: Observable[]) => unknown, thisArg?: any): Observable[];
     filter(predicate: any, thisArg?: any) {
         return this.observeables.filter(predicate, thisArg);
     }
-    reduce(callbackfn: (previousValue: ObserifyMatch<Item>, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>): ObserifyMatch<Item>;
-    reduce(callbackfn: (previousValue: ObserifyMatch<Item>, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>, initialValue: ObserifyMatch<Item>): ObserifyMatch<Item>;
-    reduce<U>(callbackfn: (previousValue: U, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => U, initialValue: U): U;
-    reduce(callbackfn: any, initialValue?: any): ObserifyMatch<Item> {
+    reduce(callbackfn: (previousValue: Observable, currentValue: Observable, currentIndex: number, array: Observable[]) => Observable): Observable;
+    reduce(callbackfn: (previousValue: Observable, currentValue: Observable, currentIndex: number, array: Observable[]) => Observable, initialValue: Observable): Observable;
+    reduce<U>(callbackfn: (previousValue: U, currentValue: Observable, currentIndex: number, array: Observable[]) => U, initialValue: U): U;
+    reduce(callbackfn: any, initialValue?: any): Observable {
         return this.observeables.reduce(callbackfn, initialValue);
     }
-    reduceRight(callbackfn: (previousValue: ObserifyMatch<Item>, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>): ObserifyMatch<Item>;
-    reduceRight(callbackfn: (previousValue: ObserifyMatch<Item>, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => ObserifyMatch<Item>, initialValue: ObserifyMatch<Item>): ObserifyMatch<Item>;
-    reduceRight<U>(callbackfn: (previousValue: U, currentValue: ObserifyMatch<Item>, currentIndex: number, array: ObserifyMatch<Item>[]) => U, initialValue: U): U;
-    reduceRight(callbackfn: any, initialValue?: any): ObserifyMatch<Item> {
+    reduceRight(callbackfn: (previousValue: Observable, currentValue: Observable, currentIndex: number, array: Observable[]) => Observable): Observable;
+    reduceRight(callbackfn: (previousValue: Observable, currentValue: Observable, currentIndex: number, array: Observable[]) => Observable, initialValue: Observable): Observable;
+    reduceRight<U>(callbackfn: (previousValue: U, currentValue: Observable, currentIndex: number, array: Observable[]) => U, initialValue: U): U;
+    reduceRight(callbackfn: any, initialValue?: any): Observable {
         return this.observeables.reduceRight(callbackfn, initialValue);
     }
-    find<S extends ObserifyMatch<Item>>(predicate: (this: void, value: ObserifyMatch<Item>, index: number, obj: ObserifyMatch<Item>[]) => value is S, thisArg?: any): S | undefined;
-    find(predicate: (value: ObserifyMatch<Item>, index: number, obj: ObserifyMatch<Item>[]) => unknown, thisArg?: any): ObserifyMatch<Item> | undefined;
-    find(predicate: any, thisArg?: any): ObserifyMatch<Item> | undefined {
+    find<S extends Observable>(predicate: (this: void, value: Observable, index: number, obj: Observable[]) => value is S, thisArg?: any): S | undefined;
+    find(predicate: (value: Observable, index: number, obj: Observable[]) => unknown, thisArg?: any): Observable | undefined;
+    find(predicate: any, thisArg?: any): Observable | undefined {
         return this.observeables.find(predicate, thisArg);
     }
-    findIndex(predicate: (value: ObserifyMatch<Item>, index: number, obj: ObserifyMatch<Item>[]) => unknown, thisArg?: any): number {
+    findIndex(predicate: (value: Observable, index: number, obj: Observable[]) => unknown, thisArg?: any): number {
         return this.observeables.findIndex(predicate, thisArg);
     }
-    fill(value: ObserifyMatch<Item>, start?: number, end?: number) {
+    fill(value: Observable, start?: number, end?: number) {
         return this.observeables.fill(value, start, end);
     }
     copyWithin(target: number, start: number, end?: number) {
         return this.observeables.copyWithin(target, start, end);
     }
-    includes(searchElement: ObserifyMatch<Item>, fromIndex?: number): boolean {
+    includes(searchElement: Observable, fromIndex?: number): boolean {
         return this.observeables.includes(searchElement, fromIndex);
     }
-    flatMap<U, This = undefined>(callback: (this: This, value: ObserifyMatch<Item>, index: number, array: ObserifyMatch<Item>[]) => U | readonly U[], thisArg?: This) {
+    flatMap<U, This = undefined>(callback: (this: This, value: Observable, index: number, array: Observable[]) => U | readonly U[], thisArg?: This) {
         return this.observeables.flatMap(callback, thisArg);
     }
     flat(depth = 1) {
         return this.observeables.flat(depth);
     }
-    [Symbol.iterator](): IterableIterator<ObserifyMatch<Item>> {
+    [Symbol.iterator](): IterableIterator<Observable> {
         return this.observeables[Symbol.iterator]()
     }
 }
 
-export class ObserveableData {
-    static Value: ObserifyValueConstructor = ObserveableValue as ObserifyValueConstructor;
-    static Map: ObserifyMapConstructor = ObserveableMap as ObserifyMapConstructor;
-    static List: ObserifyListConstructor = ObserveableList as ObserifyListConstructor;
+// type A = Normalize<{name: string, age: number, pass: false}[]>
+
+// let a:{name: string, age: number, pass: boolean}[];
+
+// a = [{name: 'a', age: 1, pass: false}];
+
+// let list: ObservableList<{ id: number; title: string; description: string; done: boolean; }[]>;
+// list = new ObserifyList([{id: 0, title: '', description: '', done: false}]);
+
+export class Observable {
+    static Value = ObserifyValue as ObservableValueConstruct;
+    static Map = ObserifyMap as unknown as ObservableMapConstruct;
+    static List = ObserifyList as ObservableListConstruct;
 }

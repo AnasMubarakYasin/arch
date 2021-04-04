@@ -1,7 +1,7 @@
 import { ProcessManagementUnsafe } from './unsafe-util.js';
 
 type HandlerInit = {
-    [index: string]: (data: any) => Promise<any>;
+    [index: string]: (data: any) => Promise<any> | any;
 }
 type KeyOf<O> = keyof O;
 type ValueOf<O> = O[KeyOf<O>];

@@ -1,4 +1,4 @@
-import { html, forOf, block } from '../../../src/html-templating.js';
+import { html, forOf, watchOf } from '../../../src/templating/index.js';
 import { action } from './controller.js';
 export const view = (detail, list) => {
     const getId = (element) => parseInt(element.closest('li')?.dataset.id ?? '-1');
@@ -42,7 +42,7 @@ export const view = (detail, list) => {
                 <button class="btn md-icons">search</button>
             </div>
             <article class="display-box" state="${detail.state}">
-                ${block(detail, (raw, data) => {
+                ${watchOf(detail, (raw, data) => {
         if (detail.state.equal('display')) {
             raw `
                             <h2 class="subtitle">${detail.title}</h2>

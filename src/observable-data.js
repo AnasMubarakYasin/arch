@@ -1,28 +1,22 @@
 import { ObserverAPIUnsafe, ObserverUnsafe } from './unsafe-util.js';
-class ObserveableValue extends ObserverUnsafe {
+class ObserifyValue extends ObserverUnsafe {
 }
-class ObserveableMap extends ObserverAPIUnsafe {
+class ObserifyMap extends ObserverAPIUnsafe {
     constructor(data) {
         super(data);
         this.size = 0;
         for (const [key, value] of Object.entries(data)) {
             let obserify;
             if (Array.isArray(value)) {
-                obserify = new ObserveableList(value);
+                obserify = new ObserifyList(value);
             }
             else if (typeof value == 'object') {
-                obserify = new ObserveableMap(value);
+                obserify = new ObserifyMap(value);
             }
             else {
-                obserify = new ObserveableValue(value);
+                obserify = new ObserifyValue(value);
             }
             Object.defineProperty(this, key, {
-                // set(value) {
-                //     obserify.set(value);
-                // },
-                // get() {
-                //     return obserify.get();
-                // },
                 value: obserify,
                 enumerable: true
             });
@@ -64,7 +58,7 @@ class ObserveableMap extends ObserverAPIUnsafe {
         yield* this[Symbol.iterator]();
     }
 }
-class ObserveableList extends ObserverAPIUnsafe {
+class ObserifyList extends ObserverAPIUnsafe {
     constructor(list) {
         super(list);
         // [index: number]: Item;
@@ -109,13 +103,13 @@ class ObserveableList extends ObserverAPIUnsafe {
         for (const item of items) {
             let obserify;
             if (Array.isArray(item)) {
-                obserify = new ObserveableList(item);
+                obserify = new ObserifyList(item);
             }
             else if (typeof item == 'object') {
-                obserify = new ObserveableMap(item);
+                obserify = new ObserifyMap(item);
             }
             else {
-                obserify = new ObserveableValue(item);
+                obserify = new ObserifyValue(item);
             }
             result.push(obserify);
         }
@@ -246,12 +240,17 @@ class ObserveableList extends ObserverAPIUnsafe {
         return this.observeables[Symbol.iterator]();
     }
 }
-let ObserveableData = /** @class */ (() => {
-    class ObserveableData {
+// type A = Normalize<{name: string, age: number, pass: false}[]>
+// let a:{name: string, age: number, pass: boolean}[];
+// a = [{name: 'a', age: 1, pass: false}];
+// let list: ObservableList<{ id: number; title: string; description: string; done: boolean; }[]>;
+// list = new ObserifyList([{id: 0, title: '', description: '', done: false}]);
+let Observable = /** @class */ (() => {
+    class Observable {
     }
-    ObserveableData.Value = ObserveableValue;
-    ObserveableData.Map = ObserveableMap;
-    ObserveableData.List = ObserveableList;
-    return ObserveableData;
+    Observable.Value = ObserifyValue;
+    Observable.Map = ObserifyMap;
+    Observable.List = ObserifyList;
+    return Observable;
 })();
-export { ObserveableData };
+export { Observable };

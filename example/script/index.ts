@@ -1,1 +1,5 @@
-import '../page/home/index.js';
+import {App} from './app.js';
+
+const app = new App();
+
+app.createPage();

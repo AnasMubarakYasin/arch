@@ -305,7 +305,7 @@ export class ObserveableChildNodes extends ObserveableNodeUnsafe {
         }
         return this;
     }
-    adapter(data, render) {
+    adapterAPI(data, render) {
         const method = data.method;
         if (method == 'pop' || method == 'shift' || method == 'reverse') {
             this[method]();

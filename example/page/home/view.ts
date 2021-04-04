@@ -1,11 +1,11 @@
-import { html, forOf, block } from '../../../src/html-templating.js';
-import { ObserveableListInstance, ObserveableMapInstance } from '../../../src/observeable-data.js';
+import { html, forOf, watchOf } from '../../../src/templating/index.js';
+import { ObservableList, ObservableMap } from '../../../src/observable-data.js';
 import { action } from './controller.js';
 
 type Detail = {state: string, title: string, description: string};
 type List = {id: number, title: string, description: string, done: boolean}[];
 
-export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableListInstance<List>) => {
+export const view = (detail: ObservableMap<Detail>, list: ObservableList<List>) => {
     const getId = (element: HTMLElement) => parseInt(element.closest('li')?.dataset.id ?? '-1');
     const itemClick = (event: MouseEvent) => {
         action.dispatch('showItem', {id: getId(event.target as HTMLElement)});
@@ -47,7 +47,7 @@ export const view = (detail: ObserveableMapInstance<Detail>, list: ObserveableLi
                 <button class="btn md-icons">search</button>
             </div>
             <article class="display-box" state="${detail.state}">
-                ${block(detail, (raw, data) => {
+                ${watchOf(detail, (raw, data) => {
                     if (detail.state.equal('display')) {
                         raw`
                             <h2 class="subtitle">${detail.title}</h2>

@@ -1,5 +1,5 @@
 import { ActionController } from "../../../src/action-controller.js";
-import { detail, list } from './index.js';
+import { detail, list } from '../home.js';
 
 console.log(list);
 
