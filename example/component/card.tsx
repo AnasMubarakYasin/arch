@@ -1,4 +1,4 @@
-import { jsx } from '../../src/jsx.jsx';
+import { jsx, Fragment } from '../../src/jsx.js';
 
 const text = 'world';
 const List = (attr: { data: any[] }, ...children: Element[]) => (
@@ -9,7 +9,7 @@ interface Property extends JSX.Property {
   age: number;
 }
 class Task implements JSX.ElementClass {
-  class!: Task;
+  class!: typeof Task;
   property: Property;
   constructor(property: Property) {
     this.property = property;
@@ -23,7 +23,9 @@ class Task implements JSX.ElementClass {
 const a = (
   <div class="box">
     <img src="/" alt="" srcset="" />
-    <span>hello {text}</span>
+    <>
+      <span>hello {text}</span>
+    </>
     <List data={[]} />
     <Task name="" age={1}>
       <li>{true}</li>

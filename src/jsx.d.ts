@@ -538,8 +538,16 @@ declare namespace JSX {
     create(): DOMElement;
   }
   interface Property extends ElementChildrenAttribute {
-    [key: string]: any;
+    [key: string]: string | number | boolean | symbol | EventInit | Observable | any;
   }
+  type EventInit =
+    | [
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | EventListenerOptions | undefined
+      ]
+    | EventListenerOrEventListenerObject;
+  type Children = (Element | string | number | boolean | Observable)[];
   interface ElementAttributesProperty {
     property: Property;
   }
@@ -547,15 +555,31 @@ declare namespace JSX {
     children?: any[] | any;
   }
   interface ElementClass extends ElementAttributesProperty {
-    class: any;
+    class: NewableFunction;
     render(): DOMElement;
   }
-  interface ElementFunction{
+  interface ElementFunction {
     (attribute: Property, ...children: Children): DOMElement;
-  };
+  }
+  interface SubscribeHandler<V = any> {
+    (raw: V): void;
+  }
+  interface Observable<V = any> {
+    subscribe(handler: SubscribeHandler<V>): any;
+    unsubscribe(handler: SubscribeHandler<V>): any;
+    get(): V;
+    set(val: V): any;
+  }
+  interface HTMLComponent extends HTMLElement {
+    create(attribute: Property): any;
+  }
+  interface Factory {
+    (tag: any, attributes: Property, ...children: Children): Element;
+  }
+  interface Fragment {}
 }
 
 interface DOMElement extends Element {}
 
-function jsx(): JSX.Element;
-// function frag(): any;
+var jsx: JSX.Factory;
+var Fragment: JSX.Fragment;

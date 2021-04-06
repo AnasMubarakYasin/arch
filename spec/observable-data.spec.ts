@@ -4,9 +4,13 @@ describe('Observable data', () => {
         it('should listen on value change', () => {
             const foo = new Observable.Value('foo');
 
-            const listener = (value: string) => {}
+            const listener = jest.fn((val: any) => {});
             
             foo.subscribe(listener);
+
+            foo.set('baz');
+
+            expect(listener.mock.calls).toHaveBeenCalledWith('baz');
         });
     });
 });

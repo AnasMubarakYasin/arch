@@ -245,12 +245,8 @@ class ObserifyList extends ObserverAPIUnsafe {
 // a = [{name: 'a', age: 1, pass: false}];
 // let list: ObservableList<{ id: number; title: string; description: string; done: boolean; }[]>;
 // list = new ObserifyList([{id: 0, title: '', description: '', done: false}]);
-let Observable = /** @class */ (() => {
-    class Observable {
-    }
-    Observable.Value = ObserifyValue;
-    Observable.Map = ObserifyMap;
-    Observable.List = ObserifyList;
-    return Observable;
-})();
-export { Observable };
+export class Observable {
+}
+Observable.Value = ObserifyValue;
+Observable.Map = ObserifyMap;
+Observable.List = ObserifyList;

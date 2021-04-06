@@ -1,33 +1,16 @@
 /// <reference path="jsx.d.ts" />
 
-type Attributes = {
-  [key: string]: string | number | boolean | symbol | EventInit | Observable;
-};
-type Children = (JSXRuntime | string | number | boolean | Observable)[];
-interface SubscribeHandler<V = any> {
-  (raw: V): void;
-}
-interface Observable<V = any> {
-  subscribe(handler: SubscribeHandler<V>): any;
-  unsubscribe(handler: SubscribeHandler<V>): any;
-  get(): V;
-  set(val: V): any;
-}
-export interface WEBComponent extends HTMLElement {
-  create(attribute: Attributes): any;
-}
 export interface FunctionComponent extends JSX.ElementFunction {}
 export interface ClassComponent extends JSX.ElementClass {
   new (attribute: Attributes, ...slot: Children): ClassComponent;
 }
+export interface WEBComponent extends JSX.HTMLComponent {}
+export interface Observable<V = any> extends JSX.Observable<V> {};
+type SubscribeHandler<V = any> = JSX.SubscribeHandler<V>;
+type Attributes = JSX.Property;
+type Children = JSX.Children;
 type Tag = string | FunctionComponent | ClassComponent;
-type EventInit =
-  | [
-      type: string,
-      listener: EventListenerOrEventListenerObject,
-      options?: boolean | EventListenerOptions | undefined
-    ]
-  | EventListenerOrEventListenerObject;
+type EventInit = JSX.EventInit;
 type RegisteredEvent = { eventInit: EventInit };
 type RegisteredID = { symbol: symbol };
 type RegisteredObserver = { observer: Observable; handler: SubscribeHandler };
@@ -35,7 +18,7 @@ type RegisteredObserver = { observer: Observable; handler: SubscribeHandler };
 const MAP_ID: Map<symbol, Element> = new Map();
 const MAP_EVENT: Map<EventInit, { element: Element; key: string }> = new Map();
 
-export class JSXRuntime {
+export class JSXRuntime implements JSX.Element {
   registeredEvent: RegisteredEvent[] = [];
   registeredID: RegisteredID[] = [];
   registeredObserver: RegisteredObserver[] = [];
@@ -165,6 +148,7 @@ export class JSXRuntime {
         child.destroy();
       }
     }
+    (this.element as Element).remove();
     this.registeredEvent.length = 0;
     this.registeredObserver.length = 0;
     this.registeredID.length = 0;
@@ -213,4 +197,4 @@ export function jsx(tag: Tag, attr?: Attributes, ...children: Children) {
   return new JSXRuntime(tag, attr ?? {}, children);
 }
 
-// export function frag() {}
+export const Fragment = {}

@@ -1,3 +1,6 @@
+src/*.js
+src/*.jsx
+
 # Logs
 logs
 *.log

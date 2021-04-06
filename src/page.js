@@ -4,6 +4,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var PageRuntime_1, Page_1;
 import { attribute } from './component.js';
 import { Router } from './router.js';
 import { html } from './templating/index.js';
@@ -166,224 +167,210 @@ export function page(name) {
         return PageClass;
     };
 }
-let PageRuntime = /** @class */ (() => {
-    var PageRuntime_1;
-    let PageRuntime = PageRuntime_1 = class PageRuntime extends HTMLElement {
-        constructor() {
-            super(...arguments);
-            this.stack = [];
-            this.loader = (name) => Promise.resolve(Page);
+let PageRuntime = PageRuntime_1 = class PageRuntime extends HTMLElement {
+    constructor() {
+        super(...arguments);
+        this.stack = [];
+        this.loader = (name) => Promise.resolve(Page);
+    }
+    set target(value) {
+        this.setAttribute('target', value);
+    }
+    get target() {
+        return this.getAttribute('target');
+    }
+    start(path) {
+        if (!this.target) {
+            this.target = 'main';
         }
-        set target(value) {
-            this.setAttribute('target', value);
+        if (PageRuntime_1.instance) {
+            throw new Error('The page-layout must have one instance');
         }
-        get target() {
-            return this.getAttribute('target');
+        console.log('[PAGE] starting', path);
+        window.addEventListener('popstate', (event) => {
+            this.navigate(location.pathname, event.state);
+        });
+        if (Router.isAbsolute(path)) {
+            this.redirect(path, history.state);
         }
-        start(path) {
-            if (!this.target) {
-                this.target = 'main';
-            }
-            if (PageRuntime_1.instance) {
-                throw new Error('The page-layout must have one instance');
-            }
-            console.log('[PAGE] starting', path);
-            window.addEventListener('popstate', (event) => {
-                this.navigate(location.pathname, event.state);
-            });
-            if (Router.isAbsolute(path)) {
-                this.redirect(path, history.state);
-            }
-            else {
-                this.redirect(path, history.state);
-            }
+        else {
+            this.redirect(path, history.state);
         }
-        navigate(path, data = {}) {
-            path = Router.Path.resolve(path);
-            console.time('[PAGE] navigate');
-            const page = this.queue(path, data);
-            history.pushState(data, page.title, page.path);
-            console.timeEnd('[PAGE] navigate');
-            console.log('[PAGE] navigate', path);
+    }
+    navigate(path, data = {}) {
+        path = Router.Path.resolve(path);
+        console.time('[PAGE] navigate');
+        const page = this.queue(path, data);
+        history.pushState(data, page.title, page.path);
+        console.timeEnd('[PAGE] navigate');
+        console.log('[PAGE] navigate', path);
+    }
+    redirect(path, data = {}) {
+        path = Router.Path.resolve(path);
+        console.time('[PAGE] redirect');
+        const page = this.queue(path, data);
+        history.replaceState(data, page.title, page.path);
+        console.timeEnd('[PAGE] redirect');
+        console.log('[PAGE] redirect', path);
+    }
+    forward() {
+        history.forward();
+    }
+    backward() {
+        history.back();
+    }
+    getPage(path) {
+        return this.querySelector(`[path="${path}"]`);
+    }
+    getNotFoundPage(path) {
+        if (path == '/404') {
+            throw new Error('Page not found');
         }
-        redirect(path, data = {}) {
-            path = Router.Path.resolve(path);
-            console.time('[PAGE] redirect');
-            const page = this.queue(path, data);
-            history.replaceState(data, page.title, page.path);
-            console.timeEnd('[PAGE] redirect');
-            console.log('[PAGE] redirect', path);
-        }
-        forward() {
-            history.forward();
-        }
-        backward() {
-            history.back();
-        }
-        getPage(path) {
-            return this.querySelector(`[path="${path}"]`);
-        }
-        getNotFoundPage(path) {
-            if (path == '/404') {
-                throw new Error('Page not found');
-            }
-            const page = this.getPage(Router.Path.resolve(path, '../404'));
-            if (page) {
-                return page;
-            }
-            else {
-                return this.getNotFoundPage(Router.Path.resolve(path, '..'));
-            }
-        }
-        getErrorPage(path) {
-            if (path == '/500') {
-                throw new Error('Page not found');
-            }
-            const page = this.getPage(Router.Path.resolve(path, '../500'));
-            if (page) {
-                return page;
-            }
-            else {
-                return this.getErrorPage(Router.Path.resolve(path, '..'));
-            }
-        }
-        queue(path, data) {
-            const main = document.querySelector(this.target);
-            if (!main) {
-                throw new Error('Attaching page must have main element');
-            }
-            let length = this.stack.length;
-            for (let index = 0; index < length; index++) {
-                const item = this.stack[index];
-                if (item.path == path) {
-                    index++;
-                    for (const removed of this.stack.splice(index, length - index)) {
-                        removed.detach();
-                        removed.destruct();
-                    }
-                    item.reconstruct(data);
-                    item.attach(main);
-                    return item;
-                }
-            }
-            let page = this.getPage(path);
-            if (!page) {
-                page = this.getNotFoundPage(path);
-            }
-            try {
-                page.construct(data);
-            }
-            catch (error) {
-                console.trace(error);
-                page = this.getErrorPage(path);
-                page.construct(data);
-            }
-            page.attach(main);
-            this.stack.push(page);
+        const page = this.getPage(Router.Path.resolve(path, '../404'));
+        if (page) {
             return page;
         }
-    };
-    __decorate([
-        attribute
-    ], PageRuntime.prototype, "debug", void 0);
-    PageRuntime = PageRuntime_1 = __decorate([
-        page('page-layout')
-    ], PageRuntime);
-    return PageRuntime;
-})();
+        else {
+            return this.getNotFoundPage(Router.Path.resolve(path, '..'));
+        }
+    }
+    getErrorPage(path) {
+        if (path == '/500') {
+            throw new Error('Page not found');
+        }
+        const page = this.getPage(Router.Path.resolve(path, '../500'));
+        if (page) {
+            return page;
+        }
+        else {
+            return this.getErrorPage(Router.Path.resolve(path, '..'));
+        }
+    }
+    queue(path, data) {
+        const main = document.querySelector(this.target);
+        if (!main) {
+            throw new Error('Attaching page must have main element');
+        }
+        let length = this.stack.length;
+        for (let index = 0; index < length; index++) {
+            const item = this.stack[index];
+            if (item.path == path) {
+                index++;
+                for (const removed of this.stack.splice(index, length - index)) {
+                    removed.detach();
+                    removed.destruct();
+                }
+                item.reconstruct(data);
+                item.attach(main);
+                return item;
+            }
+        }
+        let page = this.getPage(path);
+        if (!page) {
+            page = this.getNotFoundPage(path);
+        }
+        try {
+            page.construct(data);
+        }
+        catch (error) {
+            console.trace(error);
+            page = this.getErrorPage(path);
+            page.construct(data);
+        }
+        page.attach(main);
+        this.stack.push(page);
+        return page;
+    }
+};
+__decorate([
+    attribute
+], PageRuntime.prototype, "debug", void 0);
+PageRuntime = PageRuntime_1 = __decorate([
+    page('page-layout')
+], PageRuntime);
 export { PageRuntime };
-let Page = /** @class */ (() => {
-    var Page_1;
-    let Page = Page_1 = class Page extends HTMLElement {
-        constructor() {
-            super();
+let Page = Page_1 = class Page extends HTMLElement {
+    constructor() {
+        super();
+    }
+    set path(value) {
+        this.setAttribute('path', Router.Path.resolve(value));
+    }
+    get path() {
+        return this.getAttribute('path');
+    }
+    set title(value) { }
+    get title() {
+        return '';
+    }
+    set description(value) { }
+    get description() {
+        return '';
+    }
+    construct(data) {
+        this.path || (this.path = '');
+        this.onCreate(data);
+        if (!this.template) {
+            throw new Error('The template must assign in onCreate');
         }
-        set path(value) {
-            this.setAttribute('path', Router.Path.resolve(value));
+        this.template.render();
+    }
+    reconstruct(data) {
+        this.onRestart(data);
+    }
+    destruct() {
+        this.onDestroy();
+    }
+    attach(element) {
+        if (element instanceof Page_1) {
+            throw new TypeError('Cannot attach page');
         }
-        get path() {
-            return this.getAttribute('path');
+        element.append(this.template.element);
+        this.onStart();
+    }
+    detach() {
+        this.template.element.remove();
+        this.onStop();
+    }
+    append(...pages) {
+        for (const page of pages) {
+            page.path = this.path + page.path;
+            super.append(page);
         }
-        set title(value) { }
-        get title() {
-            return '';
-        }
-        set description(value) { }
-        get description() {
-            return '';
-        }
-        construct(data) {
-            this.path || (this.path = '');
-            this.onCreate(data);
-            if (!this.template) {
-                throw new Error('The template must assign in onCreate');
-            }
-            this.template.render();
-        }
-        reconstruct(data) {
-            this.onRestart(data);
-        }
-        destruct() {
-            this.onDestroy();
-        }
-        attach(element) {
-            if (element instanceof Page_1) {
-                throw new TypeError('Cannot attach page');
-            }
-            element.append(this.template.element);
-            this.onStart();
-        }
-        detach() {
-            this.template.element.remove();
-            this.onStop();
-        }
-        append(...pages) {
-            for (const page of pages) {
-                page.path = this.path + page.path;
-                super.append(page);
-            }
-        }
-        onCreate(data) { }
-        onStart() { }
-        onRestart(data) { }
-        onStop() { }
-        onDestroy() { }
-    };
-    Page = Page_1 = __decorate([
-        page('page-view')
-    ], Page);
-    return Page;
-})();
+    }
+    onCreate(data) { }
+    onStart() { }
+    onRestart(data) { }
+    onStop() { }
+    onDestroy() { }
+};
+Page = Page_1 = __decorate([
+    page('page-view')
+], Page);
 export { Page };
-let NotFoundPage = /** @class */ (() => {
-    let NotFoundPage = class NotFoundPage extends Page {
-        constructor() {
-            super();
-            this.path = '/404';
-        }
-        onCreate(data) {
-            this.template = html `<div><h1>404 Page Not Found</h1></div>`;
-        }
-    };
-    NotFoundPage = __decorate([
-        page('not-found-page')
-    ], NotFoundPage);
-    return NotFoundPage;
-})();
+let NotFoundPage = class NotFoundPage extends Page {
+    constructor() {
+        super();
+        this.path = '/404';
+    }
+    onCreate(data) {
+        this.template = html `<div><h1>404 Page Not Found</h1></div>`;
+    }
+};
+NotFoundPage = __decorate([
+    page('not-found-page')
+], NotFoundPage);
 export { NotFoundPage };
-let ErrorPage = /** @class */ (() => {
-    let ErrorPage = class ErrorPage extends Page {
-        constructor() {
-            super();
-            this.path = '/500';
-        }
-        onCreate(data) {
-            this.template = html `<div><h1>500 Error Page</h1></div>`;
-        }
-    };
-    ErrorPage = __decorate([
-        page('error-page')
-    ], ErrorPage);
-    return ErrorPage;
-})();
+let ErrorPage = class ErrorPage extends Page {
+    constructor() {
+        super();
+        this.path = '/500';
+    }
+    onCreate(data) {
+        this.template = html `<div><h1>500 Error Page</h1></div>`;
+    }
+};
+ErrorPage = __decorate([
+    page('error-page')
+], ErrorPage);
 export { ErrorPage };

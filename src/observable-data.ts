@@ -11,8 +11,8 @@ type PrimitiveTypeData<O> = {
 }
 type InferArray<A> = A extends Array<infer T> ? T : never;
 type PrimitiveDataMemberOf<P> = PrimitiveTypeData<P>[keyof PrimitiveTypeData<P>];
-type ObservableMatch<Type> = Type extends (number | string) ? ObservableValue<Type> : Type extends (true | false | boolean) ? ObservableValue<boolean> : Type extends Array<infer T> ? ObservableList<Type, T> : Type extends object ? ObservableMap<Type> : never;
-type ObservableData<T> = ObservableValue<T extends PrimitiveType ? T : never> | ObservableList<T extends Array<any> ? T : never, InferArray<T>> | ObservableMap<T extends object ? T : never>;
+type ObservableMatch<Type> = Type extends (number | string) ? ObservableValue<Type> : Type extends (true | false | boolean) ? ObservableValue<boolean> : Type extends Array<infer T> ? ObservableList<T[]> : Type extends object ? ObservableMap<Type> : never;
+type ObservableData<T> = ObservableValue<T extends PrimitiveType ? T : never> | ObservableList<T extends Array<any> ? T : never> | ObservableMap<T extends object ? T : never>;
 type ObservableMix<O extends object> = {
     [P in keyof O]: ObservableMatch<O[P]>;
 }
@@ -23,9 +23,9 @@ type NormalizeObject<O> = {
 }
 type NormalizeArray<O> = O extends Array<infer T> ? Array<Normalize<T>> : never;
 type NormalizePrmitive<O> = O extends string ? string : O extends number ? number : O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : never;
-type Normalize<O> = O extends Array<infer T> ? Array<Normalize<T>> : O extends object ? {[P in keyof O]: Normalize<O[P]>} : O extends string ? string : O extends number ? number : O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : any;
+type Normalize<O> = O extends Array<infer T> ? Array<Normalize<T>> : O extends object ? {[P in keyof O]: Normalize<O[P]>} : O extends string ? string : O extends number ? number : O extends true ? boolean : O extends false ? boolean : O extends boolean ? boolean : never;
 
-type ObservableValueConstruct = new <O extends PrimitiveType>(value: O) => ObservableValue<O>;
+type ObservableValueConstruct = new <O extends PrimitiveType>(value: Normalize<O>) => ObservableValue<O>;
 export type ObservableValue<O extends PrimitiveType> = ObserifyValue<O>;
 
 type ObservableMapConstruct = new <O extends object>(data: O) => ObservableMap<O>;
@@ -311,5 +311,5 @@ class ObserifyList<List extends Array<Item>, Item = InferArray<List>, Observable
 export class Observable {
     static Value = ObserifyValue as ObservableValueConstruct;
     static Map = ObserifyMap as unknown as ObservableMapConstruct;
-    static List = ObserifyList as ObservableListConstruct;
+    static List = ObserifyList as unknown as ObservableListConstruct;
 }

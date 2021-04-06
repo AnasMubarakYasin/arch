@@ -7,20 +7,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { Page, page } from "../../src/page.js";
 import { html } from "../../src/templating/index.js";
 import { detail, list } from '../model/home.js';
-let HomePage = /** @class */ (() => {
-    let HomePage = class HomePage extends Page {
-        onCreate() {
-            this.template = html `
+let HomePage = class HomePage extends Page {
+    onCreate() {
+        this.template = html `
       <div>
         <todo-list .model="${{ detail, list }}" />
       </div>
     `;
-        }
-        onDestroy() { }
-    };
-    HomePage = __decorate([
-        page("home-page")
-    ], HomePage);
-    return HomePage;
-})();
+    }
+    onDestroy() { }
+};
+HomePage = __decorate([
+    page("home-page")
+], HomePage);
 export { HomePage };

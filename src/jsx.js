@@ -1,4 +1,5 @@
 /// <reference path="jsx.d.ts" />
+;
 const MAP_ID = new Map();
 const MAP_EVENT = new Map();
 export class JSXRuntime {
@@ -132,6 +133,7 @@ export class JSXRuntime {
                 child.destroy();
             }
         }
+        this.element.remove();
         this.registeredEvent.length = 0;
         this.registeredObserver.length = 0;
         this.registeredID.length = 0;
@@ -179,4 +181,4 @@ function event(method, eventInit, key) {
 export function jsx(tag, attr, ...children) {
     return new JSXRuntime(tag, attr ?? {}, children);
 }
-// export function frag() {}
+export const Fragment = {};

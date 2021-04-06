@@ -1,250 +1,242 @@
-let ProcessManagementUnsafe = /** @class */ (() => {
-    class ProcessManagementUnsafe {
-        constructor(name = '') {
-            this.derferQueue = [];
-            this.taskQueue = [];
-            this.keySet = new Set();
-            this.started = false;
-            this.isSleep = false;
-            this.start();
-            this.name = name;
-            this.id = this.genPid();
-        }
-        static get instance() {
-            return this.global ?? (this.global = new ProcessManagementUnsafe('@global'));
-        }
-        get genPid() {
-            return function* () {
-                let id = 0;
-                while (true) {
-                    yield ++id;
-                }
-            };
-        }
-        get isStarted() {
-            return this.started;
-        }
-        get queued() {
-            return this.taskQueue.length;
-        }
-        sleep() {
-            return new Promise((resolve) => {
-                ProcessManagementUnsafe.debug && console.log(this.name + ' process sleep');
-                ProcessManagementUnsafe.debug && console.timeEnd(this.name + ' process live');
-                this.wakeUp = resolve;
-                this.isSleep = true;
-            }).finally(() => {
-                ProcessManagementUnsafe.debug && console.log(this.name + ' process wake up');
-                ProcessManagementUnsafe.debug && console.time(this.name + ' process live');
-                this.isSleep = false;
-            });
-        }
-        async *taskGenerator() {
+export class ProcessManagementUnsafe {
+    constructor(name = '') {
+        this.derferQueue = [];
+        this.taskQueue = [];
+        this.keySet = new Set();
+        this.started = false;
+        this.isSleep = false;
+        this.start();
+        this.name = name;
+        this.id = this.genPid();
+    }
+    static get instance() {
+        return this.global ?? (this.global = new ProcessManagementUnsafe('@global'));
+    }
+    get genPid() {
+        return function* () {
+            let id = 0;
             while (true) {
-                const task = this.taskQueue.shift();
-                if (task) {
-                    yield task;
-                }
-                else {
-                    yield this.sleep();
-                }
+                yield ++id;
             }
-        }
-        queue(data, handler, key, timeout) {
-            if (timeout && !key) {
-                throw TypeError('Cannot use timeout without key');
+        };
+    }
+    get isStarted() {
+        return this.started;
+    }
+    get queued() {
+        return this.taskQueue.length;
+    }
+    sleep() {
+        return new Promise((resolve) => {
+            ProcessManagementUnsafe.debug && console.log(this.name + ' process sleep');
+            ProcessManagementUnsafe.debug && console.timeEnd(this.name + ' process live');
+            this.wakeUp = resolve;
+            this.isSleep = true;
+        }).finally(() => {
+            ProcessManagementUnsafe.debug && console.log(this.name + ' process wake up');
+            ProcessManagementUnsafe.debug && console.time(this.name + ' process live');
+            this.isSleep = false;
+        });
+    }
+    async *taskGenerator() {
+        while (true) {
+            const task = this.taskQueue.shift();
+            if (task) {
+                yield task;
             }
-            if (key && !timeout) {
-                if (this.keySet.has(key)) {
-                    ProcessManagementUnsafe.debug && console.warn(this.name + ' The task is locked');
-                    this.taskQueue.find((task) => task.id == 0)?.reject('lala');
-                    return { id: -1, promise: Promise.resolve(undefined) };
-                }
-                else {
-                    this.keySet.add(key);
-                }
+            else {
+                yield this.sleep();
             }
-            const id = this.id.next().value;
-            return {
-                id,
-                promise: new Promise((resolve, reject) => {
-                    const task = { id, data, key, timeout, handler, reject, resolve };
-                    this.isSleep ? this.wakeUp(task) : this.taskQueue.push(task);
-                })
-            };
-        }
-        dequeue(id) {
-            let index = 0;
-            for (const task of this.taskQueue) {
-                if (task.id == id) {
-                    this.taskQueue.splice(index, 1);
-                    task.key && this.keySet.delete(task.key);
-                    return true;
-                }
-                index++;
-            }
-            return false;
-        }
-        lock(key) {
-            this.keySet.add(key);
-            return this;
-        }
-        unlock(key) {
-            this.keySet.delete(key);
-            return this;
-        }
-        start() {
-            if (!this.started) {
-                ProcessManagementUnsafe.debug && console.log(this.name + ' process start');
-                ProcessManagementUnsafe.debug && console.time(this.name + ' process live');
-                this.started = true;
-                this.process();
-            }
-            return this;
-        }
-        async process() {
-            for await (const task of this.taskGenerator()) {
-                if (task.timeout) {
-                    const index = this.derferQueue.findIndex((deferTask) => deferTask.key == task.key);
-                    if (index > -1) {
-                        const deferTask = this.derferQueue.splice(index, 1)[0];
-                        clearTimeout(deferTask.timeoutId);
-                        ProcessManagementUnsafe.debug && console.warn(this.name + ' process defer replace');
-                    }
-                    task.timeoutId = setTimeout(() => {
-                        this.isSleep ? this.wakeUp(task) : this.taskQueue.push(task);
-                        ProcessManagementUnsafe.debug && console.log(this.name + ' process defer queue');
-                    }, task.timeout);
-                    task.timeout = 0;
-                    this.derferQueue.push(task);
-                    continue;
-                }
-                try {
-                    task.resolve(await task.handler(task.data));
-                }
-                catch (error) {
-                    task.reject(new error.constructor(error.message));
-                }
-                finally {
-                    task.key && this.keySet.delete(task.key);
-                }
-            }
-        }
-        finish() {
-            ProcessManagementUnsafe.debug && console.log(this.name + ' process finish');
-            this.started = false;
-            return this;
         }
     }
-    ProcessManagementUnsafe.debug = true;
-    return ProcessManagementUnsafe;
-})();
-export { ProcessManagementUnsafe };
-let ObserverUnsafe = /** @class */ (() => {
-    class ObserverUnsafe {
-        constructor(data) {
-            this.subscribers = [];
-            this.binds = new Map();
-            this[Symbol.isConcatSpreadable] = true;
-            this.type = typeof data;
-            this.raw = data;
-            this.defer = false;
-            this.deferTime = 12;
+    queue(data, handler, key, timeout) {
+        if (timeout && !key) {
+            throw TypeError('Cannot use timeout without key');
         }
-        set(value) {
-            if (value != this.raw) {
-                const type = typeof value;
-                if (type != this.type) {
-                    throw new TypeError(`Mismatch on type, expect ${this.type} but ${type}`);
-                }
-                this.raw = value;
-                this.publish(value);
-            }
-            return this;
-        }
-        equal(value) {
-            return this.raw == value;
-        }
-        get() {
-            return this.raw;
-        }
-        update(value) {
-            this.publish(value ?? this.raw);
-            return this;
-        }
-        bind(observeableData, handler) {
-            handler = handler ?? ((value) => { observeableData.set(value); });
-            this.binds.set(observeableData, handler);
-            this.subscribe(handler);
-            observeableData.set(this.raw).subscribe((value) => { this.set(value); });
-            return this;
-        }
-        unbind(observeableData) {
-            const handler = this.binds.get(observeableData);
-            if (handler) {
-                this.unsubscribe(handler);
-                observeableData.unbind(this);
+        if (key && !timeout) {
+            if (this.keySet.has(key)) {
+                ProcessManagementUnsafe.debug && console.warn(this.name + ' The task is locked');
+                this.taskQueue.find((task) => task.id == 0)?.reject('lala');
+                return { id: -1, promise: Promise.resolve(undefined) };
             }
             else {
-                throw new Error('bind not exist');
+                this.keySet.add(key);
             }
-            return this;
         }
-        subscribe(handler) {
-            const type = typeof handler;
-            if (type == 'function') {
-                this.subscribers.push(handler);
-            }
-            else {
-                throw new TypeError(`Mismatch on type, expect function but ${type}`);
-            }
-            ;
-            return this;
-        }
-        unsubscribe(handler) {
-            let index = 0;
-            let pos = 0;
-            for (const subscriber of this.subscribers) {
-                if (Object.is(subscriber, handler)) {
-                    pos = index;
-                }
-                index++;
-            }
-            if (pos) {
-                this.subscribers.splice(pos, 1);
+        const id = this.id.next().value;
+        return {
+            id,
+            promise: new Promise((resolve, reject) => {
+                const task = { id, data, key, timeout, handler, reject, resolve };
+                this.isSleep ? this.wakeUp(task) : this.taskQueue.push(task);
+            })
+        };
+    }
+    dequeue(id) {
+        let index = 0;
+        for (const task of this.taskQueue) {
+            if (task.id == id) {
+                this.taskQueue.splice(index, 1);
+                task.key && this.keySet.delete(task.key);
                 return true;
             }
-            else {
-                return false;
-            }
+            index++;
         }
-        publish(value) {
-            console.time('@' + this.constructor.name + ' publish ' + (this.defer ? 'defer' : ''));
-            if (this.defer) {
-                ObserverUnsafe.broadcast.queue(null, async () => {
-                    for (const subscriber of this.subscribers) {
-                        await subscriber(value);
-                    }
-                }, 'publish', this.deferTime);
-            }
-            else {
-                for (const subscriber of this.subscribers) {
-                    subscriber(value);
+        return false;
+    }
+    lock(key) {
+        this.keySet.add(key);
+        return this;
+    }
+    unlock(key) {
+        this.keySet.delete(key);
+        return this;
+    }
+    start() {
+        if (!this.started) {
+            ProcessManagementUnsafe.debug && console.log(this.name + ' process start');
+            ProcessManagementUnsafe.debug && console.time(this.name + ' process live');
+            this.started = true;
+            this.process();
+        }
+        return this;
+    }
+    async process() {
+        for await (const task of this.taskGenerator()) {
+            if (task.timeout) {
+                const index = this.derferQueue.findIndex((deferTask) => deferTask.key == task.key);
+                if (index > -1) {
+                    const deferTask = this.derferQueue.splice(index, 1)[0];
+                    clearTimeout(deferTask.timeoutId);
+                    ProcessManagementUnsafe.debug && console.warn(this.name + ' process defer replace');
                 }
+                task.timeoutId = setTimeout(() => {
+                    this.isSleep ? this.wakeUp(task) : this.taskQueue.push(task);
+                    ProcessManagementUnsafe.debug && console.log(this.name + ' process defer queue');
+                }, task.timeout);
+                task.timeout = 0;
+                this.derferQueue.push(task);
+                continue;
             }
-            console.timeEnd('@' + this.constructor.name + ' publish ' + (this.defer ? 'defer' : ''));
-        }
-        [Symbol.toPrimitive](hint) {
-            return this.raw;
-        }
-        toJSON(key) {
-            return this.raw;
+            try {
+                task.resolve(await task.handler(task.data));
+            }
+            catch (error) {
+                task.reject(new error.constructor(error.message));
+            }
+            finally {
+                task.key && this.keySet.delete(task.key);
+            }
         }
     }
-    ObserverUnsafe.broadcast = new ProcessManagementUnsafe('@ObserverUnsafe');
-    return ObserverUnsafe;
-})();
-export { ObserverUnsafe };
+    finish() {
+        ProcessManagementUnsafe.debug && console.log(this.name + ' process finish');
+        this.started = false;
+        return this;
+    }
+}
+ProcessManagementUnsafe.debug = true;
+export class ObserverUnsafe {
+    constructor(data) {
+        this.subscribers = [];
+        this.binds = new Map();
+        this[Symbol.isConcatSpreadable] = true;
+        this.type = typeof data;
+        this.raw = data;
+        this.defer = false;
+        this.deferTime = 12;
+    }
+    set(value) {
+        if (value != this.raw) {
+            const type = typeof value;
+            if (type != this.type) {
+                throw new TypeError(`Mismatch on type, expect ${this.type} but ${type}`);
+            }
+            this.raw = value;
+            this.publish(value);
+        }
+        return this;
+    }
+    equal(value) {
+        return this.raw == value;
+    }
+    get() {
+        return this.raw;
+    }
+    update(value) {
+        this.publish(value ?? this.raw);
+        return this;
+    }
+    bind(observeableData, handler) {
+        handler = handler ?? ((value) => { observeableData.set(value); });
+        this.binds.set(observeableData, handler);
+        this.subscribe(handler);
+        observeableData.set(this.raw).subscribe((value) => { this.set(value); });
+        return this;
+    }
+    unbind(observeableData) {
+        const handler = this.binds.get(observeableData);
+        if (handler) {
+            this.unsubscribe(handler);
+            observeableData.unbind(this);
+        }
+        else {
+            throw new Error('bind not exist');
+        }
+        return this;
+    }
+    subscribe(handler) {
+        const type = typeof handler;
+        if (type == 'function') {
+            this.subscribers.push(handler);
+        }
+        else {
+            throw new TypeError(`Mismatch on type, expect function but ${type}`);
+        }
+        ;
+        return this;
+    }
+    unsubscribe(handler) {
+        let index = 0;
+        let pos = 0;
+        for (const subscriber of this.subscribers) {
+            if (Object.is(subscriber, handler)) {
+                pos = index;
+            }
+            index++;
+        }
+        if (pos) {
+            this.subscribers.splice(pos, 1);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    publish(value) {
+        console.time('@' + this.constructor.name + ' publish ' + (this.defer ? 'defer' : ''));
+        if (this.defer) {
+            ObserverUnsafe.broadcast.queue(null, async () => {
+                for (const subscriber of this.subscribers) {
+                    await subscriber(value);
+                }
+            }, 'publish', this.deferTime);
+        }
+        else {
+            for (const subscriber of this.subscribers) {
+                subscriber(value);
+            }
+        }
+        console.timeEnd('@' + this.constructor.name + ' publish ' + (this.defer ? 'defer' : ''));
+    }
+    [Symbol.toPrimitive](hint) {
+        return this.raw;
+    }
+    toJSON(key) {
+        return this.raw;
+    }
+}
+ObserverUnsafe.broadcast = new ProcessManagementUnsafe('@ObserverUnsafe');
 export class ObserverAPIUnsafe extends ObserverUnsafe {
     constructor() {
         super(...arguments);

@@ -7,57 +7,56 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { Component, component } from '../../src/component.js';
 import { Observable, } from '../../src/observable-data.js';
 import { forOf, html, watchOf } from '../../src/templating/index.js';
-let TodoListComponent = /** @class */ (() => {
-    let TodoListComponent = class TodoListComponent extends Component {
-        constructor() {
-            super(...arguments);
-            this.itemClick = (event) => {
-                // action.dispatch('showItem', { id: getId(event.target as HTMLElement) });
-            };
-            this.deleteItem = (event) => {
-                event.stopPropagation();
-                // action.dispatch('deleteItem', { id: getId(event.target as HTMLElement) });
-            };
-            this.addItem = (event) => {
-                // action.dispatch('addItem');
-            };
-            this.editItem = (event) => {
-                // action.dispatch('editItem');
-            };
-            this.editDoneItem = (event) => {
-                // action.dispatch('editDoneItem');
-            };
-            this.editTitle = (event) => {
-                // action.dispatch('editTitle', {
-                //   value: (event.target as HTMLInputElement).value,
-                // });
-            };
-            this.editDescription = (event) => {
-                // action.dispatch('editDescription', {
-                //   value: (event.target as HTMLInputElement).value,
-                // });
-            };
-            this.completeItem = (event) => {
-                event.stopPropagation();
-                // action.dispatch('checkItem', { id: getId(event.target as HTMLElement) });
-            };
-            this.searchItem = (event) => {
-                // action.dispatch('searchItem', {
-                //   value: (event.target as HTMLInputElement).value,
-                // });
-            };
-        }
-        onCreate() {
-            this.shadowRoot.append(html `<link rel="stylesheet" href="/example/style/index.css"/>`.render().element);
-            this.detail = new Observable.Map({
-                title: '',
-                description: '',
-                state: 'display',
-            });
-            this.list = new Observable.List([
-                { id: 0, title: '', description: '', done: false },
-            ]);
-            this.template = html `
+let TodoListComponent = class TodoListComponent extends Component {
+    constructor() {
+        super(...arguments);
+        this.itemClick = (event) => {
+            // action.dispatch('showItem', { id: getId(event.target as HTMLElement) });
+        };
+        this.deleteItem = (event) => {
+            event.stopPropagation();
+            // action.dispatch('deleteItem', { id: getId(event.target as HTMLElement) });
+        };
+        this.addItem = (event) => {
+            // action.dispatch('addItem');
+        };
+        this.editItem = (event) => {
+            // action.dispatch('editItem');
+        };
+        this.editDoneItem = (event) => {
+            // action.dispatch('editDoneItem');
+        };
+        this.editTitle = (event) => {
+            // action.dispatch('editTitle', {
+            //   value: (event.target as HTMLInputElement).value,
+            // });
+        };
+        this.editDescription = (event) => {
+            // action.dispatch('editDescription', {
+            //   value: (event.target as HTMLInputElement).value,
+            // });
+        };
+        this.completeItem = (event) => {
+            event.stopPropagation();
+            // action.dispatch('checkItem', { id: getId(event.target as HTMLElement) });
+        };
+        this.searchItem = (event) => {
+            // action.dispatch('searchItem', {
+            //   value: (event.target as HTMLInputElement).value,
+            // });
+        };
+    }
+    onCreate() {
+        this.shadowRoot.append(html `<link rel="stylesheet" href="/example/style/index.css"/>`.render().element);
+        this.detail = new Observable.Map({
+            title: '',
+            description: '',
+            state: 'display',
+        });
+        this.list = new Observable.List([
+            { id: 0, title: '', description: '', done: false },
+        ]);
+        this.template = html `
       <section class="todo-list-component" translate="false" theme="dark">
         <header class="header">
           <img
@@ -77,17 +76,17 @@ let TodoListComponent = /** @class */ (() => {
         </div>
         <article class="display-box" state="${this.detail.state}">
           ${watchOf(this.detail, (html, data) => {
-                if (data.state.equal('display')) {
-                    html `
+            if (data.state.equal('display')) {
+                html `
                 <h2 class="subtitle">${data.title}</h2>
                 <p class="body">${data.description}</p>
                 <button class="btn md-icons" onclick="${this.editItem}">
                   edit
                 </button>
               `.flush();
-                }
-                else {
-                    html `
+            }
+            else {
+                html `
                 <input
                   class="input"
                   placeholder="title"
@@ -104,12 +103,12 @@ let TodoListComponent = /** @class */ (() => {
                   done
                 </button>
               `.flush();
-                }
-            })}
+            }
+        })}
         </article>
         <ul class="todo-list">
           ${forOf(this.list, (html, item) => {
-                html `
+            html `
               <li
                 data-id="${item.id}"
                 data-done="${item.done}"
@@ -129,21 +128,19 @@ let TodoListComponent = /** @class */ (() => {
                 </button>
               </li>
             `.flush();
-            })}
+        })}
         </ul>
         <button class="btn md-icons" onclick="${this.addItem}">add</button>
       </section>
     `;
-        }
-        modelChangedCallback(model) {
-            this.detail = model.detail;
-            this.list = model.list;
-            return this;
-        }
-    };
-    TodoListComponent = __decorate([
-        component('todo-list')
-    ], TodoListComponent);
-    return TodoListComponent;
-})();
+    }
+    modelChangedCallback(model) {
+        this.detail = model.detail;
+        this.list = model.list;
+        return this;
+    }
+};
+TodoListComponent = __decorate([
+    component('todo-list')
+], TodoListComponent);
 export { TodoListComponent };

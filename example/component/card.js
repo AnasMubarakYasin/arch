@@ -1,4 +1,4 @@
-import { jsx } from '../../src/jsx.jsx';
+import { jsx, Fragment } from '../../src/jsx.js';
 const text = 'world';
 const List = (attr, ...children) => (jsx("ul", null, children));
 class Task {
@@ -11,9 +11,10 @@ class Task {
 }
 const a = (jsx("div", { class: "box" },
     jsx("img", { src: "/", alt: "", srcset: "" }),
-    jsx("span", null,
-        "hello ",
-        text),
+    jsx(Fragment, null,
+        jsx("span", null,
+            "hello ",
+            text)),
     jsx(List, { data: [] }),
     jsx(Task, { name: "", age: 1 },
         jsx("li", null, true))));
